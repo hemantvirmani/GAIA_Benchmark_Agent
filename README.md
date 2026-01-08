@@ -269,10 +269,10 @@ Simply run `python app.py` locally. The app will detect it's not in a Hugging Fa
 
 Contributions are welcome! Areas for improvement:
 - Add more tools (database access, code execution, etc.)
-- Implement caching for repeated queries
-- Add async processing for batch questions
-- Optimize token usage and costs
+- Move the Benchmark from 50% to 100%
 - Improve error handling and retry logic
+- Try with smaller LLMs
+- Make it work with Ollama
 
 ## License
 
