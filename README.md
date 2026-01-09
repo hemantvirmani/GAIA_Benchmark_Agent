@@ -1,3 +1,19 @@
+---
+title: GAIA Benchmark Agent
+emoji: 🕵🏻‍♂️
+colorFrom: indigo
+colorTo: indigo
+sdk: gradio
+sdk_version: 6.2.0
+app_file: app.py
+pinned: false
+hf_oauth: true
+hf_oauth_expiration_minutes: 480
+---
+
+Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+
+
 # GAIA Benchmark Agent
 
 A LangGraph-based AI agent designed to solve questions from the GAIA (General AI Assistants) benchmark. This agent uses Google's Gemini model with custom tools for web search, file processing, and multimodal analysis to answer complex questions requiring reasoning and information gathering.
