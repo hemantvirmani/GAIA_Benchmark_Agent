@@ -43,6 +43,45 @@ def FetchQuestions(api_url: str):
         print(f"An unexpected error occurred fetching questions: {e}")
         return f"An unexpected error occurred fetching questions: {e}", None
 
+def load_questions_offline(file_path="files/questions.json"):
+    """Load questions from local file for testing.
+
+    Returns:
+        list: List of question dicts, or None if file doesn't exist/fails to load
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            questions = json.load(f)
+            print(f"[INFO] Loaded {len(questions)} questions from {file_path}")
+            return questions
+    except FileNotFoundError:
+        print(f"[ERROR] Questions file not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to load questions from {file_path}: {e}")
+        return None
+
+def get_questions(test_mode=False):
+    """
+    Get questions either from local file (test mode) or API (production mode).
+
+    Args:
+        test_mode: If True, load from local file. If False, fetch from API.
+
+    Returns:
+        list: List of question dicts
+    """
+    if test_mode:
+        questions = load_questions_offline()
+        if questions:
+            return questions
+        else:
+            print("[WARNING] Offline loading failed, falling back to API")
+            # Fallback to API
+            return FetchQuestions(DEFAULT_API_URL)
+    else:
+        return FetchQuestions(DEFAULT_API_URL)
+
 def submit_and_score(username: str, answers_payload: list):
     """
     Submit answers to the GAIA scoring server and return status message.
@@ -118,21 +157,25 @@ def run_and_submit_all(username: str):
     Fetches all questions, runs the MyLangGraphAgent on them, submits all answers,
     and displays the results.
     """
+    # Fetch questions from API (always online for submission)
+    questions_data = get_questions(test_mode=False)
 
-    # 1. Instantiate Agent
+    if not isinstance(questions_data, list):
+        return f"Failed to fetch questions: {questions_data}", None
+
+    # Instantiate Agent
     try:
         agent = MyLangGraphAgent()
     except Exception as e:
         print(f"Error instantiating agent: {e}")
         return f"Error initializing agent: {e}", None
 
-    # 2. Fetch Questions
-    questions_data = FetchQuestions(DEFAULT_API_URL)
-
-    # 3. Run Agent on all questions
+    # Prepare data structures for submission
     results_log = []
     answers_payload = []
-    print(f"Running agent on {len(questions_data)} questions...")
+    total = len(questions_data)
+
+    print(f"Running agent on {total} questions...")
 
     for idx, item in enumerate(questions_data, 1):
         task_id = item.get("task_id")
@@ -144,26 +187,29 @@ def run_and_submit_all(username: str):
             continue
 
         print(f"\n{'#'*60}")
-        print(f"Processing Question {idx}/{len(questions_data)} - Task ID: {task_id}")
+        print(f"Processing Question {idx}/{total} - Task ID: {task_id}")
         print(f"{'#'*60}")
 
         try:
-            # Run agent with question and optional file_name
-            submitted_answer = agent(question_text, file_name=file_name)
+            # Run agent
+            answer = agent(question_text, file_name=file_name)
 
-            answers_payload.append({"task_id": task_id, "submitted_answer": submitted_answer})
+            # Success
+            answers_payload.append({"task_id": task_id, "submitted_answer": answer})
             print(f"\n[RESULT] Task ID: {task_id}")
             print(f"Question: {question_text[:200]}{'...' if len(question_text) > 200 else ''}")
-            print(f"Answer: {submitted_answer}")
+            print(f"Answer: {answer}")
             results_log.append({
                 "Task ID": task_id,
                 "Question": question_text,
-                "Submitted Answer": submitted_answer
+                "Submitted Answer": answer
             })
 
         except Exception as e:
             print(f"[ERROR] Exception running agent on task {task_id}: {e}")
             error_msg = f"AGENT ERROR: {str(e)[:100]}"
+            
+            # Error
             answers_payload.append({"task_id": task_id, "submitted_answer": error_msg})
             results_log.append({
                 "Task ID": task_id,
@@ -175,7 +221,7 @@ def run_and_submit_all(username: str):
         print("Agent did not produce any answers to submit.")
         return "Agent did not produce any answers to submit.", pd.DataFrame(results_log)
 
-    # 4. Submit answers and get score
+    # Submit answers and get score
     status_message = submit_and_score(username, answers_payload)
     results_df = pd.DataFrame(results_log)
     return status_message, results_df
@@ -254,62 +300,65 @@ def run_test_code(filter=None):
                 If None, processes all questions.
     """
     log_output = []
-    results_to_verify = []
     log_output.append("=== Processing Example Questions One by One ===")
 
-    # Fetch all questions
-    my_questions_data = FetchQuestions(DEFAULT_API_URL)
+    # Fetch questions (OFFLINE for testing)
+    my_questions_data = get_questions(test_mode=True)
+
     if not isinstance(my_questions_data, list):
-        error_msg = f"Failed to fetch questions: {my_questions_data}"
+        error_msg = f"Failed to load questions: {my_questions_data}"
         print(error_msg)
         return error_msg
 
     # Apply filter or use all questions
     if filter is not None:
-        # Filter to specific indices
         questions_to_process = [
             my_questions_data[i] for i in filter if i < len(my_questions_data)
         ]
         log_output.append(f"Testing {len(questions_to_process)} selected questions (indices: {filter})")
     else:
-        # Process all questions
         questions_to_process = my_questions_data
         log_output.append(f"Testing all {len(questions_to_process)} questions")
 
     # Instantiate Agent
     try:
-        my_agent = MyLangGraphAgent()
+        agent = MyLangGraphAgent()
     except Exception as e:
-        msg = f"Error instantiating agent: {e}"
-        print(msg)
-        return msg
+        print(f"Error instantiating agent: {e}")
+        return pd.DataFrame([f"Error initializing agent: {e}"])
 
-    # Process each question separately
-    try:
-        for i, question_item in enumerate(questions_to_process, 1):
-            # Use .get() for safe access (returns None if key doesn't exist)
-            task_id = question_item.get("task_id")
-            question_text = question_item.get("question")
-            file_name = question_item.get("file_name")
+    results_to_verify = []
 
-            if not question_text:
-                log_output.append(f"\nQuestion {i}: [ERROR] Missing question text")
-                continue
+    for idx, item in enumerate(questions_to_process, 1):
+        task_id = item.get("task_id")
+        question_text = item.get("question")
+        file_name = item.get("file_name")
 
-            log_output.append(f"\nQuestion {i} (Task ID: {task_id}): {question_text}")
-            if file_name:
-                log_output.append(f"File: {file_name}")
+        if not task_id or question_text is None:
+            print(f"\nSkipping item with missing task_id or question: {item}\n")
+            continue
+        
+        log_output.append(f"\nQuestion {idx} (Task ID: {task_id}): {question_text}")
+        if file_name:
+            log_output.append(f"File: {file_name}")
 
-            # Run agent with question and optional file_name
-            my_answer = my_agent(question_text, file_name=file_name)
+        try:
+            # Run agent
+            answer = agent(question_text, file_name=file_name)
 
-            print(f"Question: {question_text} Answer: {my_answer}")
-            log_output.append(f"Answer: {my_answer}")
-            results_to_verify.append((task_id, question_text, my_answer))
-    except Exception as e:
-            error_msg = f"Error running agent on task: {e}"
-            print(error_msg)
-            log_output.append(error_msg)
+            log_output.append(f"Answer: {answer}")
+            print(f"Question: {question_text} Answer: {answer}")
+            
+            results_to_verify.append((task_id, question_text, answer))
+
+        except Exception as e:
+            print(f"[ERROR] Exception running agent on task {task_id}: {e}")
+            error_msg = f"AGENT ERROR: {str(e)[:100]}"
+            
+            log_output.append(f"Answer: {error_msg}")
+            print(f"Question: {question_text} Answer: {error_msg}")
+            
+            results_to_verify.append((task_id, question_text, error_msg))
 
     log_output.append("\n=== Completed Example Questions ===")
     verify_answers(results_to_verify, log_output)
@@ -318,7 +367,8 @@ def run_test_code(filter=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the agent application.")
-    parser.add_argument("--test", action="store_true", help="Run local tests only and exit.")
+    parser.add_argument("--test", action="store_true", help="Run local tests on selected questions and exit.")
+    parser.add_argument("--testall", action="store_true", help="Run local tests on all questions and exit.")
     args = parser.parse_args()
 
     print("\n" + "-"*30 + " App Starting " + "-"*30)
@@ -341,15 +391,21 @@ if __name__ == "__main__":
 
     print("-"*(60 + len(" App Starting ")) + "\n")
 
-    if args.test and not space_id_startup:
-        print("Running test code (CLI mode)...")
-        # Specify question indices to test, or None for all questions
-        # Examples:
-        # - (0, 1, 3, 4, 5, 9, 11, 13, 14, 17, 18) - All 11 incorrect questions
-        # - (0, 1, 4, 5, 14, 17) - All 6 incorrect except ones with files
-        # - None - Test all 20 questions
-        test_filter = (4, 7, 15)  # Testing Q5, Q8, Q16
-        result = run_test_code(filter=test_filter)
+    if (args.test or args.testall) and not space_id_startup:
+        if args.test:
+            print("Running test code (CLI mode)...")
+            # Specify question indices to test, or None for all questions
+            # Examples:
+            # - (0, 1, 3, 4, 5, 9, 11, 13, 14, 17, 18) - All 11 incorrect questions
+            # - (0, 1, 4, 5, 14, 17) - All 6 incorrect except ones with files
+            # - None - Test all 20 questions
+            test_filter = (4, 7, 15)  # Testing Q5, Q8, Q16
+            result = run_test_code(filter=test_filter)
+        elif args.testall:
+            print("Running test code on ALL questions (CLI mode)...")
+            result = run_test_code(filter=None)  # Test all questions
+
+        # Common result printing logic
         if isinstance(result, pd.DataFrame):
             # Print DataFrame content without truncation
             pd.set_option('display.max_colwidth', None)
