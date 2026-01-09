@@ -221,25 +221,25 @@ def run_and_submit_all(username: str):
     if results is None:
         return "Error initializing agent.", None
 
-    # Prepare data structures for submission
-    results_log = []
-    answers_payload = []
+    # Prepare data structures: one for API submission, one for UI display
+    answers_for_api = []
+    results_for_display = []
 
     for task_id, question_text, answer in results:
-        answers_payload.append({"task_id": task_id, "submitted_answer": answer})
-        results_log.append({
+        answers_for_api.append({"task_id": task_id, "submitted_answer": answer})
+        results_for_display.append({
             "Task ID": task_id,
             "Question": question_text,
             "Submitted Answer": answer
         })
 
-    if not answers_payload:
+    if not answers_for_api:
         print("Agent did not produce any answers to submit.")
-        return "Agent did not produce any answers to submit.", pd.DataFrame(results_log)
+        return "Agent did not produce any answers to submit.", pd.DataFrame(results_for_display)
 
     # Submit answers and get score
-    status_message = submit_and_score(username, answers_payload)
-    results_df = pd.DataFrame(results_log)
+    status_message = submit_and_score(username, answers_for_api)
+    results_df = pd.DataFrame(results_for_display)
     return status_message, results_df
 
 def load_ground_truth(file_path="files/metadata.jsonl"):
@@ -315,26 +315,26 @@ def run_test_code(filter=None):
         filter: Optional tuple/list of question indices to test (e.g., (4, 7, 15)).
                 If None, processes all questions.
     """
-    log_output = []
-    log_output.append("=== Processing Example Questions One by One ===")
+    results_for_display = []
+    results_for_display.append("=== Processing Example Questions One by One ===")
 
     # Fetch questions (OFFLINE for testing)
-    my_questions_data = get_questions(test_mode=True)
+    questions_data = get_questions(test_mode=True)
 
-    if not isinstance(my_questions_data, list):
-        error_msg = f"Failed to load questions: {my_questions_data}"
+    if not isinstance(questions_data, list):
+        error_msg = f"Failed to load questions: {questions_data}"
         print(error_msg)
         return error_msg
 
     # Apply filter or use all questions
     if filter is not None:
         questions_to_process = [
-            my_questions_data[i] for i in filter if i < len(my_questions_data)
+            questions_data[i] for i in filter if i < len(questions_data)
         ]
-        log_output.append(f"Testing {len(questions_to_process)} selected questions (indices: {filter})")
+        results_for_display.append(f"Testing {len(questions_to_process)} selected questions (indices: {filter})")
     else:
-        questions_to_process = my_questions_data
-        log_output.append(f"Testing all {len(questions_to_process)} questions")
+        questions_to_process = questions_data
+        results_for_display.append(f"Testing all {len(questions_to_process)} questions")
 
     # Run agent on selected questions
     results = run_agent_on_questions(questions_to_process)
@@ -342,15 +342,9 @@ def run_test_code(filter=None):
     if results is None:
         return pd.DataFrame(["Error initializing agent."])
 
-    # Format results for verification
-    for task_id, question_text, answer in results:
-        log_output.append(f"\nTask ID: {task_id}")
-        log_output.append(f"Question: {question_text}")
-        log_output.append(f"Answer: {answer}")
-
-    log_output.append("\n=== Completed Example Questions ===")
-    verify_answers(results, log_output)
-    return pd.DataFrame(log_output)
+    results_for_display.append("\n=== Completed Example Questions ===")
+    verify_answers(results, results_for_display)
+    return pd.DataFrame(results_for_display)
 
 
 if __name__ == "__main__":
