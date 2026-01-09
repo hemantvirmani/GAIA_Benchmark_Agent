@@ -77,10 +77,8 @@ def get_questions(test_mode=False):
             return questions
         else:
             print("[WARNING] Offline loading failed, falling back to API")
-            # Fallback to API
-            return FetchQuestions(DEFAULT_API_URL)
-    else:
-        return FetchQuestions(DEFAULT_API_URL)
+    # Fetch from API
+    return FetchQuestions(DEFAULT_API_URL)
 
 def submit_and_score(username: str, answers_payload: list):
     """
