@@ -395,7 +395,7 @@ def main():
             # Examples:
             # - (0, 1, 3, 4, 5, 9, 11, 13, 14, 17, 18) - All 11 incorrect questions
             # - (0, 1, 4, 5, 14, 17) - All 6 incorrect except ones with files
-            test_filter = (4, 7, 15)  # Testing Q5, Q8, Q16
+            test_filter = (1, 4, 7, 15)  # Testing Q1, Q5, Q8, Q16
         else:  # args.testall
             test_filter = None  # Test all questions
 
