@@ -166,8 +166,8 @@ class MyLangGraphAgent:
         step_count = state.get("step_count", 0)
 
         # Stop if we've exceeded maximum steps
-        if step_count >= 25:
-            print(f"[WARNING] Max steps (25) reached, forcing termination")
+        if step_count >= 40:  # Increased from 25 to handle complex multi-step reasoning
+            print(f"[WARNING] Max steps (40) reached, forcing termination")
             # Force a final answer if we don't have one
             if not state.get("answer"):
                 state["answer"] = "Error: Maximum iteration limit reached"
@@ -216,7 +216,7 @@ class MyLangGraphAgent:
         try:
             response = self.graph.invoke(
                 {"question": question, "messages": [], "answer": None, "step_count": 0, "file_name": file_name or ""},
-                config={"recursion_limit": 75}  # Reduced from 100 to 50
+                config={"recursion_limit": 80}  # Must be >= 2x step limit (40 * 2 = 80)
             )
 
             elapsed_time = time.time() - start_time
@@ -252,6 +252,22 @@ class MyLangGraphAgent:
                 print(f"[WARNING] Answer was {type(answer)}, converted to string")
 
             answer = answer.strip()
+
+            # Additional validation for numerical answers
+            # Remove common formatting issues that break exact matching
+            if answer:
+                # Remove comma separators from numbers (e.g., "1,000" -> "1000")
+                if ',' in answer and answer.replace(',', '').replace('.', '').isdigit():
+                    answer = answer.replace(',', '')
+                    print(f"[VALIDATION] Removed comma separators from answer")
+
+                # Ensure no trailing/leading whitespace or punctuation
+                answer = answer.strip().rstrip('.')
+
+                # Log if answer looks suspicious (for debugging)
+                if any(char in answer for char in ['{', '}', '[', ']', '`', '*', '#']):
+                    print(f"[WARNING] Answer contains suspicious formatting characters: {answer[:100]}")
+
             print(f"[FINAL ANSWER] {answer}")
             return answer
 
