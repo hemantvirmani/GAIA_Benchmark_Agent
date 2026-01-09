@@ -1,5 +1,4 @@
 import os
-import sys
 import argparse
 import requests
 import pandas as pd
@@ -351,7 +350,8 @@ def run_test_code(filter=None):
     return pd.DataFrame(results_for_display)
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the application."""
     parser = argparse.ArgumentParser(description="Run the agent application.")
     parser.add_argument("--test", action="store_true", help="Run local tests on selected questions and exit.")
     parser.add_argument("--testall", action="store_true", help="Run local tests on all questions and exit.")
@@ -383,12 +383,12 @@ if __name__ == "__main__":
     print("-"*(60 + len(" App Starting ")) + "\n")
 
     # Execute based on run mode
-    if run_mode == RunMode.UI: # Launch Gradio UI
+    if run_mode == RunMode.UI:
         print("Launching Gradio Interface for Basic Agent Evaluation...")
         grTestApp = create_ui(run_and_submit_all, run_test_code)
         grTestApp.launch()
 
-    else # run_mode == RunMode.CLI:
+    else:  # RunMode.CLI
         # Determine test filter based on which CLI flag was used
         if args.test:
             # Specify question indices to test
@@ -411,3 +411,7 @@ if __name__ == "__main__":
                     print(val)
         else:
             print(result)
+
+
+if __name__ == "__main__":
+    main()
