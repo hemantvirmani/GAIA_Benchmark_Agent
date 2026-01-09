@@ -9,6 +9,8 @@ import json
 from agents import MyLangGraphAgent
 # Import Gradio UI creation function
 from gradioapp import create_ui
+# Import scoring function for answer verification
+from scorer import question_scorer
 
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
@@ -150,54 +152,102 @@ def run_and_submit_all(username: str):
         return status_message, results_df
 
 def load_ground_truth(file_path="files/metadata.jsonl"):
+    """Load ground truth data indexed by task_id.
+
+    Returns:
+        dict: Mapping of task_id -> {"question": str, "answer": str}
+    """
     truth_mapping = {}
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             for line in f:
                 data = json.loads(line)
+                task_id = data.get("task_id")
                 question = data.get("Question")
                 answer = data.get("Final answer")
-                if question and answer:
-                    truth_mapping[question] = answer
+                if task_id and answer:
+                    truth_mapping[task_id] = {
+                        "question": question,
+                        "answer": answer
+                    }
     except Exception as e:
         print(f"Error loading ground truth: {e}")
     return truth_mapping
 
 def verify_answers(results, log_output):
+    """Verify answers against ground truth using the official GAIA scorer.
+
+    Args:
+        results: List of tuples (task_id, question_text, answer)
+        log_output: List to append verification results to
+    """
     ground_truth = load_ground_truth()
     log_output.append("\n=== Verification Results ===")
-    for question, answer in results:
-        if question in ground_truth:
-            correct_answer = ground_truth[question]
-            is_correct = (str(answer).strip() == str(correct_answer).strip())
-            log_output.append(f"Question: {question}...")
+
+    correct_count = 0
+    total_count = 0
+
+    for task_id, question_text, answer in results:
+        if task_id in ground_truth:
+            truth_data = ground_truth[task_id]
+            correct_answer = truth_data["answer"]
+
+            # Use the official GAIA question_scorer for comparison
+            # This handles numbers, lists, and strings with proper normalization
+            is_correct = question_scorer(str(answer), str(correct_answer))
+
+            if is_correct:
+                correct_count += 1
+            total_count += 1
+
+            log_output.append(f"Task ID: {task_id}")
+            log_output.append(f"Question: {question_text[:100]}...")
             log_output.append(f"Expected: {correct_answer}")
             log_output.append(f"Got: {answer}")
-            log_output.append(f"Match: {'Correct' if is_correct else 'Incorrect'}\n")
+            log_output.append(f"Match: {'✓ Correct' if is_correct else '✗ Incorrect'}\n")
         else:
-            log_output.append(f"Question: {question[:50]}... - No ground truth found.\n")
+            log_output.append(f"Task ID: {task_id}")
+            log_output.append(f"Question: {question_text[:50]}...")
+            log_output.append(f"No ground truth found.\n")
 
-def run_test_code():
+    # Add summary statistics
+    if total_count > 0:
+        accuracy = (correct_count / total_count) * 100
+        log_output.append("=" * 60)
+        log_output.append(f"SUMMARY: {correct_count}/{total_count} correct ({accuracy:.1f}%)")
+        log_output.append("=" * 60)
+
+def run_test_code(filter=None):
+    """Run test code on selected questions.
+
+    Args:
+        filter: Optional tuple/list of question indices to test (e.g., (4, 7, 15)).
+                If None, processes all questions.
+    """
     log_output = []
     results_to_verify = []
     log_output.append("=== Processing Example Questions One by One ===")
 
-    my_questions = []
+    # Fetch all questions
     my_questions_data = FetchQuestions(DEFAULT_API_URL)
-    if isinstance(my_questions_data, list):
-        # Extract both question and file_name for selected indices
-        my_questions = [
-            {
-                "question": my_questions_data[i]["question"],
-                "file_name": my_questions_data[i].get("file_name")
-            }
-            #for i in (0, 1, 3, 4, 5, 9, 11, 13, 14, 17, 18) if i < len(my_questions_data) - All 11 incorrect questions
-            #for i in (0, 1, 4, 5, 14, 17) if i < len(my_questions_data) - All 6 incorrect except ones with files
-            for i in (0, 5, 17) if i < len(my_questions_data)
-        ]
-        #print(f"Running these Questions:\n{chr(10).join(f'{i}. {q[\"question\"]}' for i, q in enumerate(my_questions, 1))}\n")
+    if not isinstance(my_questions_data, list):
+        error_msg = f"Failed to fetch questions: {my_questions_data}"
+        print(error_msg)
+        return error_msg
 
-    # 1. Instantiate Agent ( modify this part to create your agent)
+    # Apply filter or use all questions
+    if filter is not None:
+        # Filter to specific indices
+        questions_to_process = [
+            my_questions_data[i] for i in filter if i < len(my_questions_data)
+        ]
+        log_output.append(f"Testing {len(questions_to_process)} selected questions (indices: {filter})")
+    else:
+        # Process all questions
+        questions_to_process = my_questions_data
+        log_output.append(f"Testing all {len(questions_to_process)} questions")
+
+    # Instantiate Agent
     try:
         my_agent = MyLangGraphAgent()
     except Exception as e:
@@ -207,8 +257,9 @@ def run_test_code():
 
     # Process each question separately
     try:
-        for i, question_item in enumerate(my_questions, 1):
+        for i, question_item in enumerate(questions_to_process, 1):
             # Use .get() for safe access (returns None if key doesn't exist)
+            task_id = question_item.get("task_id")
             question_text = question_item.get("question")
             file_name = question_item.get("file_name")
 
@@ -216,7 +267,7 @@ def run_test_code():
                 log_output.append(f"\nQuestion {i}: [ERROR] Missing question text")
                 continue
 
-            log_output.append(f"\nQuestion {i}: {question_text}")
+            log_output.append(f"\nQuestion {i} (Task ID: {task_id}): {question_text}")
             if file_name:
                 log_output.append(f"File: {file_name}")
 
@@ -225,7 +276,7 @@ def run_test_code():
 
             print(f"Question: {question_text} Answer: {my_answer}")
             log_output.append(f"Answer: {my_answer}")
-            results_to_verify.append((question_text, my_answer))
+            results_to_verify.append((task_id, question_text, my_answer))
     except Exception as e:
             error_msg = f"Error running agent on task: {e}"
             print(error_msg)
@@ -263,7 +314,13 @@ if __name__ == "__main__":
 
     if args.test and not space_id_startup:
         print("Running test code (CLI mode)...")
-        result = run_test_code()
+        # Specify question indices to test, or None for all questions
+        # Examples:
+        # - (0, 1, 3, 4, 5, 9, 11, 13, 14, 17, 18) - All 11 incorrect questions
+        # - (0, 1, 4, 5, 14, 17) - All 6 incorrect except ones with files
+        # - None - Test all 20 questions
+        test_filter = (4,)  # Testing Q5, Q8, Q16
+        result = run_test_code(filter=test_filter)
         if isinstance(result, pd.DataFrame):
             # Print DataFrame content without truncation
             pd.set_option('display.max_colwidth', None)

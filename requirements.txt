@@ -11,12 +11,12 @@ langchain-core
 langchain-google-genai
 langchain-huggingface
 langchain-community
-ddgs
 pypdf
 youtube-transcript-api
 pytube
 pymupdf
-wikipedia
 nest_asyncio
 speechrecognition
 markdownify
+numpy
+pandas
