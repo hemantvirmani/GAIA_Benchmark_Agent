@@ -150,27 +150,25 @@ def submit_and_score(username: str, answers_payload: list):
         return status_message
 
 
-def run_and_submit_all(username: str):
+def run_agent_on_questions(questions_data):
     """
-    Fetches all questions, runs the MyLangGraphAgent on them, submits all answers,
-    and displays the results.
+    Run agent on a list of questions and return results.
+
+    Args:
+        questions_data: List of question dicts with task_id, question, file_name
+
+    Returns:
+        list: List of tuples (task_id, question_text, answer)
+        None if error instantiating agent
     """
-    # Fetch questions from API (always online for submission)
-    questions_data = get_questions(test_mode=False)
-
-    if not isinstance(questions_data, list):
-        return f"Failed to fetch questions: {questions_data}", None
-
     # Instantiate Agent
     try:
         agent = MyLangGraphAgent()
     except Exception as e:
         print(f"Error instantiating agent: {e}")
-        return f"Error initializing agent: {e}", None
+        return None
 
-    # Prepare data structures for submission
-    results_log = []
-    answers_payload = []
+    results = []
     total = len(questions_data)
 
     print(f"Running agent on {total} questions...")
@@ -192,28 +190,48 @@ def run_and_submit_all(username: str):
             # Run agent
             answer = agent(question_text, file_name=file_name)
 
-            # Success
-            answers_payload.append({"task_id": task_id, "submitted_answer": answer})
             print(f"\n[RESULT] Task ID: {task_id}")
             print(f"Question: {question_text[:200]}{'...' if len(question_text) > 200 else ''}")
             print(f"Answer: {answer}")
-            results_log.append({
-                "Task ID": task_id,
-                "Question": question_text,
-                "Submitted Answer": answer
-            })
+
+            results.append((task_id, question_text, answer))
 
         except Exception as e:
             print(f"[ERROR] Exception running agent on task {task_id}: {e}")
             error_msg = f"AGENT ERROR: {str(e)[:100]}"
-            
-            # Error
-            answers_payload.append({"task_id": task_id, "submitted_answer": error_msg})
-            results_log.append({
-                "Task ID": task_id,
-                "Question": question_text,
-                "Submitted Answer": error_msg
-            })
+
+            results.append((task_id, question_text, error_msg))
+
+    return results
+
+def run_and_submit_all(username: str):
+    """
+    Fetches all questions, runs the MyLangGraphAgent on them, submits all answers,
+    and displays the results.
+    """
+    # Fetch questions from API (always online for submission)
+    questions_data = get_questions(test_mode=False)
+
+    if not isinstance(questions_data, list):
+        return f"Failed to fetch questions: {questions_data}", None
+
+    # Run agent on all questions
+    results = run_agent_on_questions(questions_data)
+
+    if results is None:
+        return "Error initializing agent.", None
+
+    # Prepare data structures for submission
+    results_log = []
+    answers_payload = []
+
+    for task_id, question_text, answer in results:
+        answers_payload.append({"task_id": task_id, "submitted_answer": answer})
+        results_log.append({
+            "Task ID": task_id,
+            "Question": question_text,
+            "Submitted Answer": answer
+        })
 
     if not answers_payload:
         print("Agent did not produce any answers to submit.")
@@ -318,48 +336,20 @@ def run_test_code(filter=None):
         questions_to_process = my_questions_data
         log_output.append(f"Testing all {len(questions_to_process)} questions")
 
-    # Instantiate Agent
-    try:
-        agent = MyLangGraphAgent()
-    except Exception as e:
-        print(f"Error instantiating agent: {e}")
-        return pd.DataFrame([f"Error initializing agent: {e}"])
+    # Run agent on selected questions
+    results = run_agent_on_questions(questions_to_process)
 
-    results_to_verify = []
+    if results is None:
+        return pd.DataFrame(["Error initializing agent."])
 
-    for idx, item in enumerate(questions_to_process, 1):
-        task_id = item.get("task_id")
-        question_text = item.get("question")
-        file_name = item.get("file_name")
-
-        if not task_id or question_text is None:
-            print(f"\nSkipping item with missing task_id or question: {item}\n")
-            continue
-        
-        log_output.append(f"\nQuestion {idx} (Task ID: {task_id}): {question_text}")
-        if file_name:
-            log_output.append(f"File: {file_name}")
-
-        try:
-            # Run agent
-            answer = agent(question_text, file_name=file_name)
-
-            log_output.append(f"Answer: {answer}")
-            print(f"Question: {question_text} Answer: {answer}")
-            
-            results_to_verify.append((task_id, question_text, answer))
-
-        except Exception as e:
-            print(f"[ERROR] Exception running agent on task {task_id}: {e}")
-            error_msg = f"AGENT ERROR: {str(e)[:100]}"
-            
-            log_output.append(f"Answer: {error_msg}")
-            print(f"Question: {question_text} Answer: {error_msg}")
-            
-            results_to_verify.append((task_id, question_text, error_msg))
+    # Format results for verification
+    for task_id, question_text, answer in results:
+        log_output.append(f"\nTask ID: {task_id}")
+        log_output.append(f"Question: {question_text}")
+        log_output.append(f"Answer: {answer}")
 
     log_output.append("\n=== Completed Example Questions ===")
-    verify_answers(results_to_verify, log_output)
+    verify_answers(results, log_output)
     return pd.DataFrame(log_output)
 
 
