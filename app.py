@@ -4,6 +4,7 @@ import argparse
 import requests
 import pandas as pd
 import json
+from enum import Enum
 
 # Import agent-related code from agents module
 from agents import MyLangGraphAgent
@@ -15,6 +16,11 @@ from scorer import question_scorer
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 AGENT_TIMEOUT_SECONDS = 180  # 3 minutes max per question (enforced by agent's internal limits)
+
+# --- Run Modes ---
+class RunMode(Enum):
+    UI = "ui"   # Gradio UI mode
+    CLI = "cli" # Command-line test mode
 
 
 def FetchQuestions(api_url: str):
@@ -322,9 +328,7 @@ def run_test_code(filter=None):
     questions_data = get_questions(test_mode=True)
 
     if not isinstance(questions_data, list):
-        error_msg = f"Failed to load questions: {questions_data}"
-        print(error_msg)
-        return error_msg
+        return f"Failed to load questions: {questions_data}"
 
     # Apply filter or use all questions
     if filter is not None:
@@ -354,52 +358,56 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("\n" + "-"*30 + " App Starting " + "-"*30)
-    # Check for SPACE_HOST and SPACE_ID at startup for information
-    space_host_startup = os.getenv("SPACE_HOST")
-    space_id_startup = os.getenv("SPACE_ID") # Get SPACE_ID at startup
 
-    if space_host_startup:
-        print(f"[OK] SPACE_HOST found: {space_host_startup}")
-        print(f"   Runtime URL should be: https://{space_host_startup}.hf.space")
-    else:
-        print("[INFO] SPACE_HOST environment variable not found (running locally?).")
+    # Determine run mode
+    run_mode = RunMode.CLI if (args.test or args.testall) else RunMode.UI
 
-    if space_id_startup: # Print repo URLs if SPACE_ID is found
-        print(f"[OK] SPACE_ID found: {space_id_startup}")
-        print(f"   Repo URL: https://huggingface.co/spaces/{space_id_startup}")
-        print(f"   Repo Tree URL: https://huggingface.co/spaces/{space_id_startup}/tree/main")
-    else:
-        print("[INFO] SPACE_ID environment variable not found (running locally?). Repo URL cannot be determined.")
+    # Print environment info only in UI mode
+    if run_mode == RunMode.UI:
+        space_host = os.getenv("SPACE_HOST")
+        space_id = os.getenv("SPACE_ID")
+
+        if space_host:
+            print(f"[OK] SPACE_HOST found: {space_host}")
+            print(f"   Runtime URL should be: https://{space_host}.hf.space")
+        else:
+            print("[INFO] SPACE_HOST environment variable not found (running locally?).")
+
+        if space_id:
+            print(f"[OK] SPACE_ID found: {space_id}")
+            print(f"   Repo URL: https://huggingface.co/spaces/{space_id}")
+            print(f"   Repo Tree URL: https://huggingface.co/spaces/{space_id}/tree/main")
+        else:
+            print("[INFO] SPACE_ID environment variable not found (running locally?). Repo URL cannot be determined.")
 
     print("-"*(60 + len(" App Starting ")) + "\n")
 
-    if (args.test or args.testall) and not space_id_startup:
+    # Execute based on run mode
+    if run_mode == RunMode.UI: # Launch Gradio UI
+        print("Launching Gradio Interface for Basic Agent Evaluation...")
+        grTestApp = create_ui(run_and_submit_all, run_test_code)
+        grTestApp.launch()
+
+    else # run_mode == RunMode.CLI:
+        # Determine test filter based on which CLI flag was used
         if args.test:
-            print("Running test code (CLI mode)...")
-            # Specify question indices to test, or None for all questions
+            # Specify question indices to test
             # Examples:
             # - (0, 1, 3, 4, 5, 9, 11, 13, 14, 17, 18) - All 11 incorrect questions
             # - (0, 1, 4, 5, 14, 17) - All 6 incorrect except ones with files
-            # - None - Test all 20 questions
             test_filter = (4, 7, 15)  # Testing Q5, Q8, Q16
-            result = run_test_code(filter=test_filter)
-        elif args.testall:
-            print("Running test code on ALL questions (CLI mode)...")
-            result = run_test_code(filter=None)  # Test all questions
+        else:  # args.testall
+            test_filter = None  # Test all questions
 
-        # Common result printing logic
+        print(f"Running test code on {len(test_filter) if test_filter else 'ALL'} questions (CLI mode)...")
+        result = run_test_code(filter=test_filter)
+
+        # Print results
         if isinstance(result, pd.DataFrame):
-            # Print DataFrame content without truncation
             pd.set_option('display.max_colwidth', None)
             pd.set_option('display.max_rows', None)
-            # Iterate and print each row's content to ensure clean text output
             for col in result.columns:
-                 for val in result[col]:
-                     print(val)
+                for val in result[col]:
+                    print(val)
         else:
             print(result)
-        sys.exit(0)
-
-    print("Launching Gradio Interface for Basic Agent Evaluation...")
-    grTestApp = create_ui(run_and_submit_all, run_test_code)
-    grTestApp.launch()

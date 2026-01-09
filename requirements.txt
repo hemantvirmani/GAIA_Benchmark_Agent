@@ -17,6 +17,7 @@ pytube
 pymupdf
 nest_asyncio
 speechrecognition
+pydub
 markdownify
 numpy
 pandas
