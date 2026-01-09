@@ -19,7 +19,7 @@ from langgraph.prebuilt import ToolNode
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
-from custom_tools import custom_tools_list
+from custom_tools import get_custom_tools_list
 from system_prompt import SYSTEM_PROMPT
 
 # Suppress BeautifulSoup GuessedAtParserWarning
@@ -45,7 +45,7 @@ class MyLangGraphAgent:
         if not os.getenv("GOOGLE_API_KEY"):
             print("WARNING: GOOGLE_API_KEY not found - analyze_youtube_video will fail")
 
-        self.tools = custom_tools_list()
+        self.tools = get_custom_tools_list()
         self.llm_client_with_tools = self.create_llm_client()
         self.graph = self.build_graph()
 

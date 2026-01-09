@@ -43,19 +43,83 @@ def FetchQuestions(api_url: str):
         print(f"An unexpected error occurred fetching questions: {e}")
         return f"An unexpected error occurred fetching questions: {e}", None
 
+def submit_and_score(username: str, answers_payload: list):
+    """
+    Submit answers to the GAIA scoring server and return status message.
+
+    Args:
+        username: Hugging Face username for submission
+        answers_payload: List of dicts with {"task_id": str, "submitted_answer": str}
+
+    Returns:
+        str: Status message (success or error details)
+    """
+    space_id = os.getenv("SPACE_ID")
+    submit_url = f"{DEFAULT_API_URL}/submit"
+    agent_code = f"https://huggingface.co/spaces/{space_id}/tree/main"
+
+    # Prepare submission data
+    submission_data = {
+        "username": username.strip(),
+        "agent_code": agent_code,
+        "answers": answers_payload
+    }
+
+    print(f"\n{'='*60}")
+    print(f"Submitting {len(answers_payload)} answers for user '{username}'...")
+    print(f"{'='*60}\n")
+
+    # Submit to server
+    print(f"Submitting to: {submit_url}")
+    try:
+        response = requests.post(submit_url, json=submission_data, timeout=60)
+        response.raise_for_status()
+        result_data = response.json()
+
+        final_status = (
+            f"Submission Successful!\n"
+            f"User: {result_data.get('username')}\n"
+            f"Overall Score: {result_data.get('score', 'N/A')}% "
+            f"({result_data.get('correct_count', '?')}/{result_data.get('total_attempted', '?')} correct)\n"
+            f"Message: {result_data.get('message', 'No message received.')}"
+        )
+        print("Submission successful.")
+        return final_status
+
+    except requests.exceptions.HTTPError as e:
+        error_detail = f"Server responded with status {e.response.status_code}."
+        try:
+            error_json = e.response.json()
+            error_detail += f" Detail: {error_json.get('detail', e.response.text)}"
+        except requests.exceptions.JSONDecodeError:
+            error_detail += f" Response: {e.response.text[:500]}"
+        status_message = f"Submission Failed: {error_detail}"
+        print(status_message)
+        return status_message
+
+    except requests.exceptions.Timeout:
+        status_message = "Submission Failed: The request timed out."
+        print(status_message)
+        return status_message
+
+    except requests.exceptions.RequestException as e:
+        status_message = f"Submission Failed: Network error - {e}"
+        print(status_message)
+        return status_message
+
+    except Exception as e:
+        status_message = f"An unexpected error occurred during submission: {e}"
+        print(status_message)
+        return status_message
+
+
 def run_and_submit_all(username: str):
     """
     Fetches all questions, runs the MyLangGraphAgent on them, submits all answers,
     and displays the results.
     """
 
-    # --- Determine HF Space Runtime URL and Repo URL ---
-    space_id = os.getenv("SPACE_ID") # Get the SPACE_ID for sending link to the code
-    submit_url = f"{DEFAULT_API_URL}/submit"
-    # In the case of an app running as a hugging Face space, this link points toward your codebase ( usefull for others so please keep it public)
-    agent_code = f"https://huggingface.co/spaces/{space_id}/tree/main"
-
-    # 1. Instantiate Agent ( modify this part to create your agent)
+    # 1. Instantiate Agent
     try:
         agent = MyLangGraphAgent()
     except Exception as e:
@@ -65,14 +129,16 @@ def run_and_submit_all(username: str):
     # 2. Fetch Questions
     questions_data = FetchQuestions(DEFAULT_API_URL)
 
-    # 3. Run your Agent
+    # 3. Run Agent on all questions
     results_log = []
     answers_payload = []
     print(f"Running agent on {len(questions_data)} questions...")
+
     for idx, item in enumerate(questions_data, 1):
         task_id = item.get("task_id")
         question_text = item.get("question")
         file_name = item.get("file_name")
+
         if not task_id or question_text is None:
             print(f"\nSkipping item with missing task_id or question: {item}\n")
             continue
@@ -83,73 +149,36 @@ def run_and_submit_all(username: str):
 
         try:
             # Run agent with question and optional file_name
-            # The agent will handle file URLs internally if needed
             submitted_answer = agent(question_text, file_name=file_name)
 
             answers_payload.append({"task_id": task_id, "submitted_answer": submitted_answer})
             print(f"\n[RESULT] Task ID: {task_id}")
             print(f"Question: {question_text[:200]}{'...' if len(question_text) > 200 else ''}")
             print(f"Answer: {submitted_answer}")
-            results_log.append({"Task ID": task_id, "Question": question_text, "Submitted Answer": submitted_answer})
+            results_log.append({
+                "Task ID": task_id,
+                "Question": question_text,
+                "Submitted Answer": submitted_answer
+            })
 
         except Exception as e:
-             print(f"[ERROR] Exception running agent on task {task_id}: {e}")
-             error_msg = f"AGENT ERROR: {str(e)[:100]}"
-             answers_payload.append({"task_id": task_id, "submitted_answer": error_msg})
-             results_log.append({"Task ID": task_id, "Question": question_text, "Submitted Answer": error_msg})
+            print(f"[ERROR] Exception running agent on task {task_id}: {e}")
+            error_msg = f"AGENT ERROR: {str(e)[:100]}"
+            answers_payload.append({"task_id": task_id, "submitted_answer": error_msg})
+            results_log.append({
+                "Task ID": task_id,
+                "Question": question_text,
+                "Submitted Answer": error_msg
+            })
 
     if not answers_payload:
         print("Agent did not produce any answers to submit.")
         return "Agent did not produce any answers to submit.", pd.DataFrame(results_log)
 
-    # 4. Prepare Submission
-    submission_data = {"username": username.strip(), "agent_code": agent_code, "answers": answers_payload}
-    print(f"\n{'='*60}")
-    print(f"Agent finished. Submitting {len(answers_payload)} answers for user '{username}'...")
-    print(f"{'='*60}\n")
-
-    # 5. Submit
-    print(f"Submitting {len(answers_payload)} answers to: {submit_url}")
-    try:
-        response = requests.post(submit_url, json=submission_data, timeout=60)
-        response.raise_for_status()
-        result_data = response.json()
-        final_status = (
-            f"Submission Successful!\n"
-            f"User: {result_data.get('username')}\n"
-            f"Overall Score: {result_data.get('score', 'N/A')}% "
-            f"({result_data.get('correct_count', '?')}/{result_data.get('total_attempted', '?')} correct)\n"
-            f"Message: {result_data.get('message', 'No message received.')}"
-        )
-        print("Submission successful.")
-        results_df = pd.DataFrame(results_log)
-        return final_status, results_df
-    except requests.exceptions.HTTPError as e:
-        error_detail = f"Server responded with status {e.response.status_code}."
-        try:
-            error_json = e.response.json()
-            error_detail += f" Detail: {error_json.get('detail', e.response.text)}"
-        except requests.exceptions.JSONDecodeError:
-            error_detail += f" Response: {e.response.text[:500]}"
-        status_message = f"Submission Failed: {error_detail}"
-        print(status_message)
-        results_df = pd.DataFrame(results_log)
-        return status_message, results_df
-    except requests.exceptions.Timeout:
-        status_message = "Submission Failed: The request timed out."
-        print(status_message)
-        results_df = pd.DataFrame(results_log)
-        return status_message, results_df
-    except requests.exceptions.RequestException as e:
-        status_message = f"Submission Failed: Network error - {e}"
-        print(status_message)
-        results_df = pd.DataFrame(results_log)
-        return status_message, results_df
-    except Exception as e:
-        status_message = f"An unexpected error occurred during submission: {e}"
-        print(status_message)
-        results_df = pd.DataFrame(results_log)
-        return status_message, results_df
+    # 4. Submit answers and get score
+    status_message = submit_and_score(username, answers_payload)
+    results_df = pd.DataFrame(results_log)
+    return status_message, results_df
 
 def load_ground_truth(file_path="files/metadata.jsonl"):
     """Load ground truth data indexed by task_id.
@@ -319,7 +348,7 @@ if __name__ == "__main__":
         # - (0, 1, 3, 4, 5, 9, 11, 13, 14, 17, 18) - All 11 incorrect questions
         # - (0, 1, 4, 5, 14, 17) - All 6 incorrect except ones with files
         # - None - Test all 20 questions
-        test_filter = (4,)  # Testing Q5, Q8, Q16
+        test_filter = (4, 7, 15)  # Testing Q5, Q8, Q16
         result = run_test_code(filter=test_filter)
         if isinstance(result, pd.DataFrame):
             # Print DataFrame content without truncation

@@ -496,26 +496,26 @@ def analyze_image(question: str, file_name: str) -> str:
 # Tools List
 # ============================================================================
 
-tools = [
-    add,
-    subtract,
-    multiply,
-    divide,
-    power,
-    modulus,
-    string_reverse,
-    get_current_time_in_timezone,
-    websearch,
-    wiki_search,
-    arvix_search,
-    get_youtube_transcript,
-    get_webpage_content,
-    read_python_script,
-    read_excel_file,
-    parse_audio_file,
-    analyze_youtube_video,
-    analyze_image
-]
 
-def custom_tools_list():
+def get_custom_tools_list():
+    tools = [
+        add,
+        subtract,
+        multiply,
+        divide,
+        power,
+        modulus,
+        string_reverse,
+        get_current_time_in_timezone,
+        websearch,
+        wiki_search,
+        arvix_search,
+        get_youtube_transcript,
+        get_webpage_content,
+        read_python_script,
+        read_excel_file,
+        parse_audio_file,
+        analyze_youtube_video,
+        analyze_image
+    ]
     return tools
