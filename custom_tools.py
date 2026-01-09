@@ -421,7 +421,7 @@ def analyze_youtube_video(question: str, youtube_url: str) -> str:
 
         # Add timeout and request options
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-2.5-flash',
             contents=[types.Content(
                     parts=[
                         types.Part(file_data=types.FileData(file_uri=youtube_url)),
@@ -470,7 +470,7 @@ def analyze_image(question: str, file_name: str) -> str:
 
         # Use Gemini vision model with image data
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-2.5-flash',
             contents=[types.Content(
                 parts=[
                     types.Part(inline_data=types.Blob(
