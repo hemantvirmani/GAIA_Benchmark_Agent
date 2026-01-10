@@ -5,6 +5,9 @@ import pandas as pd
 import json
 from enum import Enum
 
+# Import configuration
+import config
+
 # Import agent-related code from agents module
 from agents import MyLangGraphAgent
 # Import Gradio UI creation function
@@ -12,9 +15,12 @@ from gradioapp import create_ui
 # Import scoring function for answer verification
 from scorer import question_scorer
 
-# --- Constants ---
-DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
-AGENT_TIMEOUT_SECONDS = 180  # 3 minutes max per question (enforced by agent's internal limits)
+# Import new utilities
+from question_loader import QuestionLoader
+from result_formatter import ResultFormatter
+from agent_runner import AgentRunner  
+from validators import InputValidator, ValidationError
+from retry_utils import retry_with_backoff
 
 # --- Run Modes ---
 class RunMode(Enum):
@@ -22,68 +28,12 @@ class RunMode(Enum):
     CLI = "cli" # Command-line test mode
 
 
-def FetchQuestions(api_url: str):
-    """Fetch questions from the given API URL."""
-
-    questions_url = f"{api_url}/questions"
-    print(f"Fetching questions from: {questions_url}")
-    try:
-        response = requests.get(questions_url, timeout=15)
-        response.raise_for_status()
-        questions_data = response.json()
-
-        if not questions_data:
-             print("Fetched questions list is empty.")
-             return "Fetched questions list is empty or invalid format.", None
-        print(f"Fetched {len(questions_data)} questions.")
-        return questions_data
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching questions: {e}")
-        return f"Error fetching questions: {e}", None
-    except requests.exceptions.JSONDecodeError as e:
-         print(f"Error decoding JSON response from questions endpoint: {e}")
-         print(f"Response text: {response.text[:500]}")
-         return f"Error decoding server response for questions: {e}", None
-    except Exception as e:
-        print(f"An unexpected error occurred fetching questions: {e}")
-        return f"An unexpected error occurred fetching questions: {e}", None
-
-def load_questions_offline(file_path="files/questions.json"):
-    """Load questions from local file for testing.
-
-    Returns:
-        list: List of question dicts, or None if file doesn't exist/fails to load
-    """
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            questions = json.load(f)
-            print(f"[INFO] Loaded {len(questions)} questions from {file_path}")
-            return questions
-    except FileNotFoundError:
-        print(f"[ERROR] Questions file not found at {file_path}")
-        return None
-    except Exception as e:
-        print(f"[ERROR] Failed to load questions from {file_path}: {e}")
-        return None
-
-def get_questions(test_mode=False):
-    """
-    Get questions either from local file (test mode) or API (production mode).
-
-    Args:
-        test_mode: If True, load from local file. If False, fetch from API.
-
-    Returns:
-        list: List of question dicts
-    """
-    if test_mode:
-        questions = load_questions_offline()
-        if questions:
-            return questions
-        else:
-            print("[WARNING] Offline loading failed, falling back to API")
-    # Fetch from API
-    return FetchQuestions(DEFAULT_API_URL)
+@retry_with_backoff(max_retries=3, initial_delay=2.0)
+def _submit_to_server(submit_url: str, submission_data: dict) -> dict:
+    """Internal function to submit to server (with retries)."""
+    response = requests.post(submit_url, json=submission_data, timeout=config.SUBMIT_TIMEOUT)
+    response.raise_for_status()
+    return response.json()
 
 def submit_and_score(username: str, answers_payload: list):
     """
@@ -96,13 +46,21 @@ def submit_and_score(username: str, answers_payload: list):
     Returns:
         str: Status message (success or error details)
     """
-    space_id = os.getenv("SPACE_ID")
-    submit_url = f"{DEFAULT_API_URL}/submit"
+    # Validate username
+    try:
+        username = InputValidator.validate_username(username)
+    except ValidationError as e:
+        error_msg = f"Invalid username: {e}"
+        print(error_msg)
+        return error_msg
+
+    space_id = config.SPACE_ID
+    submit_url = f"{config.DEFAULT_API_URL}/submit"
     agent_code = f"https://huggingface.co/spaces/{space_id}/tree/main"
 
     # Prepare submission data
     submission_data = {
-        "username": username.strip(),
+        "username": username,
         "agent_code": agent_code,
         "answers": answers_payload
     }
@@ -114,9 +72,7 @@ def submit_and_score(username: str, answers_payload: list):
     # Submit to server
     print(f"Submitting to: {submit_url}")
     try:
-        response = requests.post(submit_url, json=submission_data, timeout=60)
-        response.raise_for_status()
-        result_data = response.json()
+        result_data = _submit_to_server(submit_url, submission_data)
 
         final_status = (
             f"Submission Successful!\n"
@@ -155,88 +111,32 @@ def submit_and_score(username: str, answers_payload: list):
         return status_message
 
 
-def run_agent_on_questions(questions_data):
-    """
-    Run agent on a list of questions and return results.
-
-    Args:
-        questions_data: List of question dicts with task_id, question, file_name
-
-    Returns:
-        list: List of tuples (task_id, question_text, answer)
-        None if error instantiating agent
-    """
-    # Instantiate Agent
-    try:
-        agent = MyLangGraphAgent()
-    except Exception as e:
-        print(f"Error instantiating agent: {e}")
-        return None
-
-    results = []
-    total = len(questions_data)
-
-    print(f"Running agent on {total} questions...")
-
-    for idx, item in enumerate(questions_data, 1):
-        task_id = item.get("task_id")
-        question_text = item.get("question")
-        file_name = item.get("file_name")
-
-        if not task_id or question_text is None:
-            print(f"\nSkipping item with missing task_id or question: {item}\n")
-            continue
-
-        print(f"\n{'#'*60}")
-        print(f"Processing Question {idx}/{total} - Task ID: {task_id}")
-        print(f"{'#'*60}")
-
-        try:
-            # Run agent
-            answer = agent(question_text, file_name=file_name)
-
-            print(f"\n[RESULT] Task ID: {task_id}")
-            print(f"Question: {question_text[:200]}{'...' if len(question_text) > 200 else ''}")
-            print(f"Answer: {answer}")
-
-            results.append((task_id, question_text, answer))
-
-        except Exception as e:
-            print(f"[ERROR] Exception running agent on task {task_id}: {e}")
-            error_msg = f"AGENT ERROR: {str(e)[:100]}"
-
-            results.append((task_id, question_text, error_msg))
-
-    return results
-
 def run_and_submit_all(username: str):
     """
     Fetches all questions, runs the MyLangGraphAgent on them, submits all answers,
     and displays the results.
     """
     # Fetch questions from API (always online for submission)
-    questions_data = get_questions(test_mode=False)
+    try:
+        questions_data = QuestionLoader().get_questions(test_mode=False)
+    except Exception as e:
+        return f"Error loading questions: {e}", None
 
-    if not isinstance(questions_data, list):
-        return f"Failed to fetch questions: {questions_data}", None
+    # Validate questions data
+    try:
+        questions_data = InputValidator.validate_questions_data(questions_data)
+    except ValidationError as e:
+        return f"Invalid questions data: {e}", None
 
     # Run agent on all questions
-    results = run_agent_on_questions(questions_data)
+    results = AgentRunner().run_on_questions(questions_data)
 
     if results is None:
         return "Error initializing agent.", None
 
-    # Prepare data structures: one for API submission, one for UI display
-    answers_for_api = []
-    results_for_display = []
-
-    for task_id, question_text, answer in results:
-        answers_for_api.append({"task_id": task_id, "submitted_answer": answer})
-        results_for_display.append({
-            "Task ID": task_id,
-            "Question": question_text,
-            "Submitted Answer": answer
-        })
+    # Format data structures: one for API submission, one for UI display
+    answers_for_api = ResultFormatter.format_for_api(results)
+    results_for_display = ResultFormatter.format_for_display(results)
 
     if not answers_for_api:
         print("Agent did not produce any answers to submit.")
@@ -247,7 +147,7 @@ def run_and_submit_all(username: str):
     results_df = pd.DataFrame(results_for_display)
     return status_message, results_df
 
-def load_ground_truth(file_path="files/metadata.jsonl"):
+def load_ground_truth(file_path=config.METADATA_FILE):
     """Load ground truth data indexed by task_id.
 
     Returns:
@@ -324,23 +224,33 @@ def run_test_code(filter=None):
     results_for_display.append("=== Processing Example Questions One by One ===")
 
     # Fetch questions (OFFLINE for testing)
-    questions_data = get_questions(test_mode=True)
+    try:
+        questions_data = QuestionLoader().get_questions(test_mode=True)
+    except Exception as e:
+        return pd.DataFrame([f"Error loading questions: {e}"])
 
-    if not isinstance(questions_data, list):
-        return f"Failed to load questions: {questions_data}"
+    # Validate questions data
+    try:
+        questions_data = InputValidator.validate_questions_data(questions_data)
+    except ValidationError as e:
+        return pd.DataFrame([f"Invalid questions data: {e}"])
+
+    # Validate and apply filter
+    try:
+        filter = InputValidator.validate_filter_indices(filter, len(questions_data))
+    except ValidationError as e:
+        return pd.DataFrame([f"Invalid filter: {e}"])
 
     # Apply filter or use all questions
     if filter is not None:
-        questions_to_process = [
-            questions_data[i] for i in filter if i < len(questions_data)
-        ]
+        questions_to_process = [questions_data[i] for i in filter]
         results_for_display.append(f"Testing {len(questions_to_process)} selected questions (indices: {filter})")
     else:
         questions_to_process = questions_data
         results_for_display.append(f"Testing all {len(questions_to_process)} questions")
 
     # Run agent on selected questions
-    results = run_agent_on_questions(questions_to_process)
+    results = AgentRunner().run_on_questions(questions_to_process)
 
     if results is None:
         return pd.DataFrame(["Error initializing agent."])
@@ -364,8 +274,8 @@ def main():
 
     # Print environment info only in UI mode
     if run_mode == RunMode.UI:
-        space_host = os.getenv("SPACE_HOST")
-        space_id = os.getenv("SPACE_ID")
+        space_host = config.SPACE_HOST
+        space_id = config.SPACE_ID
 
         if space_host:
             print(f"[OK] SPACE_HOST found: {space_host}")
@@ -391,11 +301,7 @@ def main():
     else:  # RunMode.CLI
         # Determine test filter based on which CLI flag was used
         if args.test:
-            # Specify question indices to test
-            # Examples:
-            # - (0, 1, 3, 4, 5, 9, 11, 13, 14, 17, 18) - All 11 incorrect questions
-            # - (0, 1, 4, 5, 14, 17) - All 6 incorrect except ones with files
-            test_filter = (1, 4, 7, 15)  # Testing Q1, Q5, Q8, Q16
+            test_filter = config.DEFAULT_TEST_FILTER
         else:  # args.testall
             test_filter = None  # Test all questions
 
@@ -404,11 +310,7 @@ def main():
 
         # Print results
         if isinstance(result, pd.DataFrame):
-            pd.set_option('display.max_colwidth', None)
-            pd.set_option('display.max_rows', None)
-            for col in result.columns:
-                for val in result[col]:
-                    print(val)
+            ResultFormatter.print_dataframe(result)
         else:
             print(result)
 

@@ -8,6 +8,7 @@ import io
 import os
 from google import genai
 from google.genai import types
+import config
 
 from langchain_community.document_loaders import WikipediaLoader
 from langchain_community.document_loaders import ArxivLoader
@@ -421,7 +422,7 @@ def analyze_youtube_video(question: str, youtube_url: str) -> str:
 
         # Add timeout and request options
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=config.GEMINI_MODEL,
             contents=[types.Content(
                     parts=[
                         types.Part(file_data=types.FileData(file_uri=youtube_url)),
@@ -430,8 +431,8 @@ def analyze_youtube_video(question: str, youtube_url: str) -> str:
                 )
             ],
             config=types.GenerateContentConfig(
-                temperature=0,
-                max_output_tokens=1024,
+                temperature=config.GEMINI_TEMPERATURE,
+                max_output_tokens=config.GEMINI_MAX_TOKENS,
             )
         )
         return response.text
@@ -470,7 +471,7 @@ def analyze_image(question: str, file_name: str) -> str:
 
         # Use Gemini vision model with image data
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=config.GEMINI_MODEL,
             contents=[types.Content(
                 parts=[
                     types.Part(inline_data=types.Blob(
@@ -481,8 +482,8 @@ def analyze_image(question: str, file_name: str) -> str:
                 ]
             )],
             config=types.GenerateContentConfig(
-                temperature=0,
-                max_output_tokens=1024,
+                temperature=config.GEMINI_TEMPERATURE,
+                max_output_tokens=config.GEMINI_MAX_TOKENS,
             )
         )
         return response.text
