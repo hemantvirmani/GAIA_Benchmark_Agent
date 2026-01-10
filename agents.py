@@ -21,6 +21,7 @@ from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
 from custom_tools import get_custom_tools_list
 from system_prompt import SYSTEM_PROMPT
+import config
 
 # Suppress BeautifulSoup GuessedAtParserWarning
 try:
@@ -101,16 +102,42 @@ class MyLangGraphAgent:
         current_step = state.get("step_count", 0) + 1
         print(f"[STEP {current_step}] Calling assistant with {len(state['messages'])} messages")
 
-        # Invoke LLM with tools enabled
-        try:
-            response = self.llm_client_with_tools.invoke(state["messages"])
-        except Exception as e:
-            print(f"[ERROR] LLM invocation failed: {e}")
-            return {
-                "messages": [],
-                "answer": f"Error: LLM failed - {str(e)[:100]}",
-                "step_count": current_step
-            }
+        # Invoke LLM with tools enabled, with retry logic for 504 errors
+        max_retries = config.MAX_RETRIES
+        delay = config.INITIAL_RETRY_DELAY
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = self.llm_client_with_tools.invoke(state["messages"])
+                # Success - break out of retry loop
+                break
+            except Exception as e:
+                error_msg = str(e)
+
+                # Check if this is a 504 DEADLINE_EXCEEDED error
+                if "504" in error_msg and "DEADLINE_EXCEEDED" in error_msg:
+                    if attempt < max_retries:
+                        print(f"[RETRY] Attempt {attempt + 1}/{max_retries} failed with 504 DEADLINE_EXCEEDED")
+                        print(f"[RETRY] Retrying in {delay:.1f} seconds...")
+                        time.sleep(delay)
+                        delay *= config.RETRY_BACKOFF_FACTOR
+                        continue
+                    else:
+                        print(f"[RETRY] All {max_retries} retries exhausted for 504 error")
+                        print(f"[ERROR] LLM invocation failed after retries: {e}")
+                        return {
+                            "messages": [],
+                            "answer": f"Error: LLM failed after {max_retries} retries - {str(e)[:100]}",
+                            "step_count": current_step
+                        }
+                else:
+                    # Not a 504 error - fail immediately without retry
+                    print(f"[ERROR] LLM invocation failed: {e}")
+                    return {
+                        "messages": [],
+                        "answer": f"Error: LLM failed - {str(e)[:100]}",
+                        "step_count": current_step
+                    }
 
         # If no tool calls, set the final answer
         if not response.tool_calls:
