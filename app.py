@@ -288,7 +288,7 @@ def run_test_code(filter=None) -> pd.DataFrame:
 def main() -> None:
     """Main entry point for the application."""
     parser = argparse.ArgumentParser(description="Run the agent application.")
-    parser.add_argument("--test", action="store_true", help="Run local tests on selected questions and exit.")
+    parser.add_argument("--test", type=str, nargs='?', const='default', help="Run local tests on selected questions and exit. Optionally provide comma-separated question indices (e.g., --test 2,4,6). If no indices provided, uses default test questions.")
     parser.add_argument("--testall", action="store_true", help="Run local tests on all questions and exit.")
     args = parser.parse_args()
 
@@ -326,7 +326,17 @@ def main() -> None:
     else:  # RunMode.CLI
         # Determine test filter based on which CLI flag was used
         if args.test:
-            test_filter = config.DEFAULT_TEST_FILTER
+            # Check if custom indices were provided
+            if args.test == 'default':
+                # No indices provided, use default
+                test_filter = config.DEFAULT_TEST_FILTER
+            else:
+                # Parse comma-separated indices
+                try:
+                    test_filter = tuple(int(idx.strip()) for idx in args.test.split(','))
+                except ValueError:
+                    print(f"Error: Invalid test indices '{args.test}'. Must be comma-separated integers (e.g., 2,4,6)")
+                    return
         else:  # args.testall
             test_filter = None  # Test all questions
 

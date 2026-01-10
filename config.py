@@ -17,7 +17,7 @@ SUBMIT_TIMEOUT = 60
 WEBPAGE_TIMEOUT = 30
 
 # Test Configuration
-DEFAULT_TEST_FILTER = (1, 4, 7, 15)  # Q2, Q5, Q8, Q16
+DEFAULT_TEST_FILTER = (4, 7, 15)  # Q2, Q5, Q8, Q16
 
 # Display Configuration
 QUESTION_PREVIEW_LENGTH = 200  # Characters to show in question preview
