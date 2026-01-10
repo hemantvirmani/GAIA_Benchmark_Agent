@@ -4,12 +4,13 @@ import time
 import requests
 from typing import Callable, Any
 from functools import wraps
+import config
 
 
 def retry_with_backoff(
-    max_retries: int = 3,
-    initial_delay: float = 1.0,
-    backoff_factor: float = 2.0,
+    max_retries: int = config.MAX_RETRIES,
+    initial_delay: float = config.INITIAL_RETRY_DELAY,
+    backoff_factor: float = config.RETRY_BACKOFF_FACTOR,
     exceptions: tuple = (requests.RequestException,)
 ):
     """
