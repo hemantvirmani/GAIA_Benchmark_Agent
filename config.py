@@ -19,6 +19,11 @@ WEBPAGE_TIMEOUT = 30
 # Test Configuration
 DEFAULT_TEST_FILTER = (1, 4, 7, 15)  # Q2, Q5, Q8, Q16
 
+# Display Configuration
+QUESTION_PREVIEW_LENGTH = 200  # Characters to show in question preview
+ERROR_MESSAGE_LENGTH = 100  # Characters to show in error messages
+SEPARATOR_WIDTH = 60  # Width of separator lines
+
 # Environment Variables
 SPACE_HOST = os.getenv("SPACE_HOST")
 SPACE_ID = os.getenv("SPACE_ID")

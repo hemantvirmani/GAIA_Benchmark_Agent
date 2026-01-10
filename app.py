@@ -3,7 +3,12 @@ import argparse
 import requests
 import pandas as pd
 import json
+import time
 from enum import Enum
+from colorama import init
+
+# Initialize colorama for Windows compatibility
+init(autoreset=True)
 
 # Import configuration
 import config
@@ -35,7 +40,7 @@ def _submit_to_server(submit_url: str, submission_data: dict) -> dict:
     response.raise_for_status()
     return response.json()
 
-def submit_and_score(username: str, answers_payload: list):
+def submit_and_score(username: str, answers_payload: list) -> str:
     """
     Submit answers to the GAIA scoring server and return status message.
 
@@ -65,9 +70,9 @@ def submit_and_score(username: str, answers_payload: list):
         "answers": answers_payload
     }
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * config.SEPARATOR_WIDTH}")
     print(f"Submitting {len(answers_payload)} answers for user '{username}'...")
-    print(f"{'='*60}\n")
+    print(f"{'=' * config.SEPARATOR_WIDTH}\n")
 
     # Submit to server
     print(f"Submitting to: {submit_url}")
@@ -111,10 +116,13 @@ def submit_and_score(username: str, answers_payload: list):
         return status_message
 
 
-def run_and_submit_all(username: str):
+def run_and_submit_all(username: str) -> tuple:
     """
     Fetches all questions, runs the MyLangGraphAgent on them, submits all answers,
     and displays the results.
+
+    Returns:
+        tuple: (status_message: str, results_df: pd.DataFrame)
     """
     # Fetch questions from API (always online for submission)
     try:
@@ -147,8 +155,11 @@ def run_and_submit_all(username: str):
     results_df = pd.DataFrame(results_for_display)
     return status_message, results_df
 
-def load_ground_truth(file_path=config.METADATA_FILE):
+def load_ground_truth(file_path: str = config.METADATA_FILE) -> dict:
     """Load ground truth data indexed by task_id.
+
+    Args:
+        file_path: Path to the metadata file
 
     Returns:
         dict: Mapping of task_id -> {"question": str, "answer": str}
@@ -170,12 +181,13 @@ def load_ground_truth(file_path=config.METADATA_FILE):
         print(f"Error loading ground truth: {e}")
     return truth_mapping
 
-def verify_answers(results, log_output):
+def verify_answers(results: list, log_output: list, runtime: tuple = None) -> None:
     """Verify answers against ground truth using the official GAIA scorer.
 
     Args:
         results: List of tuples (task_id, question_text, answer)
         log_output: List to append verification results to
+        runtime: Optional tuple of (minutes, seconds) for total runtime
     """
     ground_truth = load_ground_truth()
     log_output.append("\n=== Verification Results ===")
@@ -197,29 +209,36 @@ def verify_answers(results, log_output):
             total_count += 1
 
             log_output.append(f"Task ID: {task_id}")
-            log_output.append(f"Question: {question_text[:100]}...")
+            log_output.append(f"Question: {question_text[:config.ERROR_MESSAGE_LENGTH]}...")
             log_output.append(f"Expected: {correct_answer}")
             log_output.append(f"Got: {answer}")
             log_output.append(f"Match: {'✓ Correct' if is_correct else '✗ Incorrect'}\n")
         else:
             log_output.append(f"Task ID: {task_id}")
-            log_output.append(f"Question: {question_text[:50]}...")
+            log_output.append(f"Question: {question_text[:config.ERROR_MESSAGE_LENGTH]}...")
             log_output.append(f"No ground truth found.\n")
 
     # Add summary statistics
     if total_count > 0:
         accuracy = (correct_count / total_count) * 100
-        log_output.append("=" * 60)
+        log_output.append("=" * config.SEPARATOR_WIDTH)
         log_output.append(f"SUMMARY: {correct_count}/{total_count} correct ({accuracy:.1f}%)")
-        log_output.append("=" * 60)
+        if runtime:
+            minutes, seconds = runtime
+            log_output.append(f"Runtime: {minutes}m {seconds}s")
+        log_output.append("=" * config.SEPARATOR_WIDTH)
 
-def run_test_code(filter=None):
+def run_test_code(filter=None) -> pd.DataFrame:
     """Run test code on selected questions.
 
     Args:
         filter: Optional tuple/list of question indices to test (e.g., (4, 7, 15)).
                 If None, processes all questions.
+
+    Returns:
+        pd.DataFrame: Results and verification output
     """
+    start_time = time.time()
     results_for_display = []
     results_for_display.append("=== Processing Example Questions One by One ===")
 
@@ -256,18 +275,24 @@ def run_test_code(filter=None):
         return pd.DataFrame(["Error initializing agent."])
 
     results_for_display.append("\n=== Completed Example Questions ===")
-    verify_answers(results, results_for_display)
+
+    # Calculate runtime
+    elapsed_time = time.time() - start_time
+    minutes = int(elapsed_time // 60)
+    seconds = int(elapsed_time % 60)
+
+    verify_answers(results, results_for_display, runtime=(minutes, seconds))
     return pd.DataFrame(results_for_display)
 
 
-def main():
+def main() -> None:
     """Main entry point for the application."""
     parser = argparse.ArgumentParser(description="Run the agent application.")
     parser.add_argument("--test", action="store_true", help="Run local tests on selected questions and exit.")
     parser.add_argument("--testall", action="store_true", help="Run local tests on all questions and exit.")
     args = parser.parse_args()
 
-    print("\n" + "-"*30 + " App Starting " + "-"*30)
+    print(f"\n{'-' * 30} App Starting {'-' * 30}")
 
     # Determine run mode
     run_mode = RunMode.CLI if (args.test or args.testall) else RunMode.UI
@@ -290,7 +315,7 @@ def main():
         else:
             print("[INFO] SPACE_ID environment variable not found (running locally?). Repo URL cannot be determined.")
 
-    print("-"*(60 + len(" App Starting ")) + "\n")
+    print(f"{'-' * (60 + len(' App Starting '))}\n")
 
     # Execute based on run mode
     if run_mode == RunMode.UI:

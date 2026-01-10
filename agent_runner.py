@@ -1,7 +1,9 @@
 """Agent execution functionality for running questions through the GAIA agent."""
 
 from typing import Optional, Tuple, List, Dict
+from colorama import Fore, Style
 from agents import MyLangGraphAgent
+import config
 
 
 class AgentRunner:
@@ -17,7 +19,7 @@ class AgentRunner:
             self.agent = MyLangGraphAgent()
             return True
         except Exception as e:
-            print(f"Error instantiating agent: {e}")
+            print(f"{Fore.RED}Error instantiating agent: {e}{Style.RESET_ALL}")
             return False
 
     def run_on_questions(self, questions_data: List[Dict]) -> Optional[List[Tuple]]:
@@ -27,7 +29,7 @@ class AgentRunner:
 
         results = []
         total = len(questions_data)
-        print(f"Running agent on {total} questions...")
+        print(f"{Fore.CYAN}Running agent on {total} questions...{Style.RESET_ALL}")
 
         for idx, item in enumerate(questions_data, 1):
             task_id = item.get("task_id")
@@ -35,22 +37,22 @@ class AgentRunner:
             file_name = item.get("file_name")
 
             if not task_id or question_text is None:
-                print(f"\nSkipping item with missing task_id or question: {item}\n")
+                print(f"\n{Fore.YELLOW}Skipping item with missing task_id or question: {item}{Style.RESET_ALL}\n")
                 continue
 
-            print(f"\n{'#'*60}")
-            print(f"Processing Question {idx}/{total} - Task ID: {task_id}")
-            print(f"{'#'*60}")
+            print(f"\n{'#' * config.SEPARATOR_WIDTH}")
+            print(f"{Fore.CYAN}Processing Question {idx}/{total} - Task ID: {task_id}{Style.RESET_ALL}")
+            print(f"{'#' * config.SEPARATOR_WIDTH}")
 
             try:
                 answer = self.agent(question_text, file_name=file_name)
-                print(f"\n[RESULT] Task ID: {task_id}")
-                print(f"Question: {question_text[:200]}{'...' if len(question_text) > 200 else ''}")
+                print(f"\n{Fore.GREEN}[RESULT] Task ID: {task_id}{Style.RESET_ALL}")
+                print(f"Question: {question_text[:config.QUESTION_PREVIEW_LENGTH]}{'...' if len(question_text) > config.QUESTION_PREVIEW_LENGTH else ''}")
                 print(f"Answer: {answer}")
                 results.append((task_id, question_text, answer))
             except Exception as e:
-                print(f"[ERROR] Exception running agent on task {task_id}: {e}")
-                error_msg = f"AGENT ERROR: {str(e)[:100]}"
+                print(f"{Fore.RED}[ERROR] Exception running agent on task {task_id}: {e}{Style.RESET_ALL}")
+                error_msg = f"AGENT ERROR: {str(e)[:config.ERROR_MESSAGE_LENGTH]}"
                 results.append((task_id, question_text, error_msg))
 
         return results

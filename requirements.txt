@@ -21,3 +21,4 @@ pydub
 markdownify
 numpy
 pandas
+colorama

@@ -27,6 +27,31 @@ from markdownify import markdownify as md
 # Helper Functions (must be defined before tools that use them)
 # ============================================================================
 
+def _sanitize_file_path(file_name: str) -> tuple:
+    """
+    Sanitize file name to prevent path traversal attacks.
+
+    Args:
+        file_name: The file name to sanitize
+
+    Returns:
+        tuple: (is_valid: bool, sanitized_name_or_error: str)
+    """
+    # Check for path traversal attempts
+    if '..' in file_name or file_name.startswith('/') or file_name.startswith('\\'):
+        return False, "Invalid file name: path traversal not allowed"
+
+    # Check for absolute paths (Windows and Unix)
+    if os.path.isabs(file_name):
+        return False, "Invalid file name: absolute paths not allowed"
+
+    # Normalize the path and ensure it doesn't escape the files directory
+    normalized = os.path.normpath(file_name)
+    if normalized.startswith('..') or os.path.isabs(normalized):
+        return False, "Invalid file name: path traversal detected"
+
+    return True, normalized
+
 def _get_file_content(file_name: str, mode: str = 'binary'):
     """
     Helper function to get file content from local filesystem or remote URL.
@@ -38,6 +63,12 @@ def _get_file_content(file_name: str, mode: str = 'binary'):
     Returns:
         tuple: (success: bool, data: bytes/str or error_message: str)
     """
+    # Sanitize file name first
+    is_valid, result = _sanitize_file_path(file_name)
+    if not is_valid:
+        return False, result
+
+    file_name = result  # Use sanitized name
     file_path = f"files/{file_name}"
 
     # Try local file first
@@ -437,7 +468,7 @@ def analyze_youtube_video(question: str, youtube_url: str) -> str:
         )
         return response.text
     except Exception as e:
-        error_msg = f"Error analyzing video: {str(e)[:200]}"
+        error_msg = f"Error analyzing video: {str(e)[:config.QUESTION_PREVIEW_LENGTH]}"
         print(error_msg)
         return error_msg
 
@@ -489,7 +520,7 @@ def analyze_image(question: str, file_name: str) -> str:
         return response.text
 
     except Exception as e:
-        error_msg = f"Error analyzing image: {str(e)[:200]}"
+        error_msg = f"Error analyzing image: {str(e)[:config.QUESTION_PREVIEW_LENGTH]}"
         print(error_msg)
         return error_msg
 
@@ -498,7 +529,12 @@ def analyze_image(question: str, file_name: str) -> str:
 # ============================================================================
 
 
-def get_custom_tools_list():
+def get_custom_tools_list() -> list:
+    """Get list of all custom tools for the agent.
+
+    Returns:
+        list: List of tool functions
+    """
     tools = [
         add,
         subtract,
