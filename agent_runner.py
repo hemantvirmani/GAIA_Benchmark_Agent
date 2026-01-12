@@ -13,7 +13,7 @@ class AgentRunner:
     def __init__(self):
         self.agent = None
 
-    def initialize_agent(self) -> bool:
+    def _initialize_agent(self) -> bool:
         """Initialize the agent. Returns True if successful."""
         try:
             self.agent = MyGAIAAgents()
@@ -24,7 +24,7 @@ class AgentRunner:
 
     def run_on_questions(self, questions_data: List[Dict]) -> Optional[List[Tuple]]:
         """Run agent on a list of questions and return results."""
-        if not self.initialize_agent():
+        if not self._initialize_agent():
             return None
 
         results = []

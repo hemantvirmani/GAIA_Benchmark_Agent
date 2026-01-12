@@ -157,7 +157,7 @@ def run_and_submit_all(username: str) -> tuple:
     results_df = pd.DataFrame(results_for_display)
     return status_message, results_df
 
-def load_ground_truth(file_path: str = config.METADATA_FILE) -> dict:
+def _load_ground_truth(file_path: str = config.METADATA_FILE) -> dict:
     """Load ground truth data indexed by task_id.
 
     Args:
@@ -183,7 +183,7 @@ def load_ground_truth(file_path: str = config.METADATA_FILE) -> dict:
         print(f"Error loading ground truth: {e}")
     return truth_mapping
 
-def verify_answers(results: list, log_output: list, runtime: tuple = None) -> None:
+def _verify_answers(results: list, log_output: list, runtime: tuple = None) -> None:
     """Verify answers against ground truth using the official GAIA scorer.
 
     Args:
@@ -191,7 +191,7 @@ def verify_answers(results: list, log_output: list, runtime: tuple = None) -> No
         log_output: List to append verification results to
         runtime: Optional tuple of (minutes, seconds) for total runtime
     """
-    ground_truth = load_ground_truth()
+    ground_truth = _load_ground_truth()
     log_output.append("\n=== Verification Results ===")
 
     correct_count = 0
@@ -283,7 +283,7 @@ def run_test_code(filter=None) -> pd.DataFrame:
     minutes = int(elapsed_time // 60)
     seconds = int(elapsed_time % 60)
 
-    verify_answers(results, logs_for_display, runtime=(minutes, seconds))
+    _verify_answers(results, logs_for_display, runtime=(minutes, seconds))
     return pd.DataFrame(logs_for_display)
 
 

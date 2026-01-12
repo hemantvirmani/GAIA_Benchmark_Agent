@@ -4,7 +4,7 @@ import gradio as gr
 
 run_and_submit_all_callback = None  # Placeholder for the actual function
 
-def run_and_submit_all_local(profile: gr.OAuthProfile | None = None):
+def _run_and_submit_all_local(profile: gr.OAuthProfile | None = None):
 
     username = None
 
@@ -49,7 +49,7 @@ def create_ui(run_and_submit_all, run_test_code):
         results_table = gr.DataFrame(label="Questions and Agent Answers", wrap=True)
 
         run_button.click(
-            fn=run_and_submit_all_local,
+            fn=_run_and_submit_all_local,
             outputs=[status_output, results_table]
         )
         

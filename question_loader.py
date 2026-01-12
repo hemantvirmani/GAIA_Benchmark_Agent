@@ -14,7 +14,7 @@ class QuestionLoader:
         self.api_url = api_url
 
     @retry_with_backoff(max_retries=3, initial_delay=1.0, backoff_factor=2.0)
-    def fetch_from_api(self) -> List[Dict]:
+    def _fetch_from_api(self) -> List[Dict]:
         """Fetch questions from the API with retry logic."""
         questions_url = f"{self.api_url}/questions"
         print(f"Fetching questions from: {questions_url}")
@@ -29,7 +29,7 @@ class QuestionLoader:
         print(f"Fetched {len(questions_data)} questions.")
         return questions_data
 
-    def load_from_file(self, file_path: str = config.QUESTIONS_FILE) -> List[Dict]:
+    def _load_from_file(self, file_path: str = config.QUESTIONS_FILE) -> List[Dict]:
         """Load questions from local file."""
         with open(file_path, 'r', encoding='utf-8') as f:
             questions = json.load(f)
@@ -40,8 +40,8 @@ class QuestionLoader:
         """Get questions from local file (test) or API (production)."""
         if test_mode:
             try:
-                return self.load_from_file()
+                return self._load_from_file()
             except Exception as e:
                 print(f"[WARNING] Offline loading failed: {e}, falling back to API")
 
-        return self.fetch_from_api()
+        return self._fetch_from_api()
