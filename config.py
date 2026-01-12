@@ -29,6 +29,8 @@ SPACE_HOST = os.getenv("SPACE_HOST")
 SPACE_ID = os.getenv("SPACE_ID")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
+ACTIVE_AGENT = "LangGraph" # Valid vales are ReActLangGraph, LLamaIndex, LangGraph, SMOL
+
 # Model Configuration
 GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_TEMPERATURE = 0

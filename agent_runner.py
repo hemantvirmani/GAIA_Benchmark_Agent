@@ -2,7 +2,7 @@
 
 from typing import Optional, Tuple, List, Dict
 from colorama import Fore, Style
-from agents import MyLangGraphAgent
+from agents import MyGAIAAgents
 import config
 
 
@@ -16,7 +16,7 @@ class AgentRunner:
     def initialize_agent(self) -> bool:
         """Initialize the agent. Returns True if successful."""
         try:
-            self.agent = MyLangGraphAgent()
+            self.agent = MyGAIAAgents()
             return True
         except Exception as e:
             print(f"{Fore.RED}Error instantiating agent: {e}{Style.RESET_ALL}")

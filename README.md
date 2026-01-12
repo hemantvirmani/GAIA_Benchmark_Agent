@@ -113,10 +113,10 @@ Edit the question indices in [app.py:196](app.py#L196) to customize which questi
 ### Using the Agent Programmatically
 
 ```python
-from agents import MyLangGraphAgent
+from agents import MyGAIAAgents
 
-# Initialize agent
-agent = MyLangGraphAgent()
+# Initialize agent (automatically uses ACTIVE_AGENT from config)
+agent = MyGAIAAgents()
 
 # Ask a question
 answer = agent("What is the capital of France?")
@@ -174,18 +174,16 @@ The agent follows strict output formatting rules defined in [system_prompt.py](s
 
 ## Configuration
 
-### Change LLM Provider
+### Change Agent Type
 
-Edit [agents.py:52](agents.py#L52) in the `create_llm_client` method:
+Edit the `ACTIVE_AGENT` variable in [config.py:32](config.py#L32):
 
 ```python
-# Use Google Gemini (default)
-agent = MyLangGraphAgent()
-
-# Use Hugging Face models
-def create_llm_client(self, model_provider: str = "huggingface"):
-    # ...
+# Valid values: "LangGraph", "ReActLangGraph", "LLamaIndex", "SMOL"
+ACTIVE_AGENT = "LangGraph"  # Currently only LangGraph is implemented
 ```
+
+The `MyGAIAAgents` wrapper class will automatically instantiate the correct agent based on this configuration.
 
 ### Adjust Step Limits
 

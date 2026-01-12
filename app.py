@@ -13,8 +13,7 @@ init(autoreset=True)
 # Import configuration
 import config
 
-# Import agent-related code from agents module
-from agents import MyLangGraphAgent
+# Agent-related code is imported via agent_runner module
 # Import Gradio UI creation function
 from gradioapp import create_ui
 # Import scoring function for answer verification
@@ -40,13 +39,13 @@ def _submit_to_server(submit_url: str, submission_data: dict) -> dict:
     response.raise_for_status()
     return response.json()
 
-def submit_and_score(username: str, answers_payload: list) -> str:
+def submit_and_score(username: str, results: list) -> str:
     """
     Submit answers to the GAIA scoring server and return status message.
 
     Args:
         username: Hugging Face username for submission
-        answers_payload: List of dicts with {"task_id": str, "submitted_answer": str}
+        results: List of tuples (task_id, question_text, answer)
 
     Returns:
         str: Status message (success or error details)
@@ -56,6 +55,14 @@ def submit_and_score(username: str, answers_payload: list) -> str:
         username = InputValidator.validate_username(username)
     except ValidationError as e:
         error_msg = f"Invalid username: {e}"
+        print(error_msg)
+        return error_msg
+
+    # Format results for API submission
+    answers_payload = ResultFormatter.format_for_api(results)
+
+    if not answers_payload:
+        error_msg = "No answers to submit."
         print(error_msg)
         return error_msg
 
@@ -118,7 +125,7 @@ def submit_and_score(username: str, answers_payload: list) -> str:
 
 def run_and_submit_all(username: str) -> tuple:
     """
-    Fetches all questions, runs the MyLangGraphAgent on them, submits all answers,
+    Fetches all questions, runs the GAIA agent on them, submits all answers,
     and displays the results.
 
     Returns:
@@ -142,16 +149,11 @@ def run_and_submit_all(username: str) -> tuple:
     if results is None:
         return "Error initializing agent.", None
 
-    # Format data structures: one for API submission, one for UI display
-    answers_for_api = ResultFormatter.format_for_api(results)
+    # Submit answers and get score (formatting happens inside submit_and_score)
+    status_message = submit_and_score(username, results)
+
+    # Format results for UI display
     results_for_display = ResultFormatter.format_for_display(results)
-
-    if not answers_for_api:
-        print("Agent did not produce any answers to submit.")
-        return "Agent did not produce any answers to submit.", pd.DataFrame(results_for_display)
-
-    # Submit answers and get score
-    status_message = submit_and_score(username, answers_for_api)
     results_df = pd.DataFrame(results_for_display)
     return status_message, results_df
 
@@ -239,8 +241,8 @@ def run_test_code(filter=None) -> pd.DataFrame:
         pd.DataFrame: Results and verification output
     """
     start_time = time.time()
-    results_for_display = []
-    results_for_display.append("=== Processing Example Questions One by One ===")
+    logs_for_display = []
+    logs_for_display.append("=== Processing Example Questions One by One ===")
 
     # Fetch questions (OFFLINE for testing)
     try:
@@ -263,10 +265,10 @@ def run_test_code(filter=None) -> pd.DataFrame:
     # Apply filter or use all questions
     if filter is not None:
         questions_to_process = [questions_data[i] for i in filter]
-        results_for_display.append(f"Testing {len(questions_to_process)} selected questions (indices: {filter})")
+        logs_for_display.append(f"Testing {len(questions_to_process)} selected questions (indices: {filter})")
     else:
         questions_to_process = questions_data
-        results_for_display.append(f"Testing all {len(questions_to_process)} questions")
+        logs_for_display.append(f"Testing all {len(questions_to_process)} questions")
 
     # Run agent on selected questions
     results = AgentRunner().run_on_questions(questions_to_process)
@@ -274,15 +276,15 @@ def run_test_code(filter=None) -> pd.DataFrame:
     if results is None:
         return pd.DataFrame(["Error initializing agent."])
 
-    results_for_display.append("\n=== Completed Example Questions ===")
+    logs_for_display.append("\n=== Completed Example Questions ===")
 
     # Calculate runtime
     elapsed_time = time.time() - start_time
     minutes = int(elapsed_time // 60)
     seconds = int(elapsed_time % 60)
 
-    verify_answers(results, results_for_display, runtime=(minutes, seconds))
-    return pd.DataFrame(results_for_display)
+    verify_answers(results, logs_for_display, runtime=(minutes, seconds))
+    return pd.DataFrame(logs_for_display)
 
 
 def main() -> None:
