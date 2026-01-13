@@ -123,10 +123,14 @@ def submit_and_score(username: str, results: list) -> str:
         return status_message
 
 
-def run_and_submit_all(username: str) -> tuple:
+def run_and_submit_all(username: str, active_agent: str = None) -> tuple:
     """
     Fetches all questions, runs the GAIA agent on them, submits all answers,
     and displays the results.
+
+    Args:
+        username: Hugging Face username for submission
+        active_agent: The agent type to use (default: config.AGENT_LANGGRAPH)
 
     Returns:
         tuple: (status_message: str, results_df: pd.DataFrame)
@@ -143,8 +147,8 @@ def run_and_submit_all(username: str) -> tuple:
     except ValidationError as e:
         return f"Invalid questions data: {e}", None
 
-    # Run agent on all questions
-    results = AgentRunner().run_on_questions(questions_data)
+    # Run agent on all questions with specified agent type
+    results = AgentRunner(active_agent=active_agent).run_on_questions(questions_data)
 
     if results is None:
         return "Error initializing agent.", None

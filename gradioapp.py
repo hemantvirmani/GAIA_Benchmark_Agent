@@ -1,11 +1,12 @@
 import gradio as gr
+import config
 
 # --- Build Gradio Interface without Blocks Context ---
 
 run_and_submit_all_callback = None  # Placeholder for the actual function
 
-def _run_and_submit_all_local(profile: gr.OAuthProfile | None = None):
-
+def _run_and_submit_all_local(profile: gr.OAuthProfile | None = None, active_agent: str = None):
+    """Run and submit with specified agent type."""
     username = None
 
     if profile is not None:
@@ -15,7 +16,15 @@ def _run_and_submit_all_local(profile: gr.OAuthProfile | None = None):
         print("User not logged in.")
         return "Please Login to Hugging Face with the button.", None
 
-    return run_and_submit_all_callback(username)
+    return run_and_submit_all_callback(username, active_agent)
+
+def _run_and_submit_langgraph(profile: gr.OAuthProfile | None = None):
+    """Run and submit with LangGraph agent."""
+    return _run_and_submit_all_local(profile, active_agent=config.AGENT_LANGGRAPH)
+
+def _run_and_submit_react(profile: gr.OAuthProfile | None = None):
+    """Run and submit with ReActLangGraph agent."""
+    return _run_and_submit_all_local(profile, active_agent=config.AGENT_REACT_LANGGRAPH)
 
 
 def create_ui(run_and_submit_all, run_test_code):
@@ -42,14 +51,23 @@ def create_ui(run_and_submit_all, run_test_code):
 
         gr.LoginButton()
 
-        run_button = gr.Button("Run Evaluation & Submit All Answers")
+        gr.Markdown("### Run Evaluation with Different Agents")
+
+        with gr.Row():
+            run_button_langgraph = gr.Button("Run with LangGraph Agent", variant="primary")
+            run_button_react = gr.Button("Run with ReAct Agent", variant="secondary")
 
         status_output = gr.Textbox(label="Run Status / Submission Result", lines=5, interactive=False)
         # Removed max_rows=10 from DataFrame constructor
         results_table = gr.DataFrame(label="Questions and Agent Answers", wrap=True)
 
-        run_button.click(
-            fn=_run_and_submit_all_local,
+        run_button_langgraph.click(
+            fn=_run_and_submit_langgraph,
+            outputs=[status_output, results_table]
+        )
+
+        run_button_react.click(
+            fn=_run_and_submit_react,
             outputs=[status_output, results_table]
         )
         

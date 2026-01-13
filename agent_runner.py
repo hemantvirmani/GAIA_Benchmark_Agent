@@ -10,13 +10,19 @@ class AgentRunner:
     """Handles agent execution and question processing.
     """
 
-    def __init__(self):
+    def __init__(self, active_agent: str = None):
+        """Initialize the AgentRunner.
+
+        Args:
+            active_agent: The agent type to use. If None, uses config.ACTIVE_AGENT.
+        """
         self.agent = None
+        self.active_agent = active_agent
 
     def _initialize_agent(self) -> bool:
         """Initialize the agent. Returns True if successful."""
         try:
-            self.agent = MyGAIAAgents()
+            self.agent = MyGAIAAgents(active_agent=self.active_agent)
             return True
         except Exception as e:
             print(f"{Fore.RED}Error instantiating agent: {e}{Style.RESET_ALL}")

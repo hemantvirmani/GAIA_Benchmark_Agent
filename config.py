@@ -29,7 +29,13 @@ SPACE_HOST = os.getenv("SPACE_HOST")
 SPACE_ID = os.getenv("SPACE_ID")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-ACTIVE_AGENT = "LangGraph" # Valid vales are ReActLangGraph, LLamaIndex, LangGraph, SMOL
+# Agent Type Constants
+AGENT_LANGGRAPH = "LangGraph"
+AGENT_REACT_LANGGRAPH = "ReActLangGraph"
+AGENT_LLAMAINDEX = "LLamaIndex"
+AGENT_SMOL = "SMOL"
+
+ACTIVE_AGENT = AGENT_REACT_LANGGRAPH  # Active agent to use by default
 
 # Model Configuration
 GEMINI_MODEL = "gemini-2.5-flash"
