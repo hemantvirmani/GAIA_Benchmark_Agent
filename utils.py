@@ -48,6 +48,61 @@ def retry_with_backoff(
     return decorator
 
 
+def extract_text_from_content(content: Any) -> str:
+    """
+    Extract plain text from various content formats returned by LLM agents.
+
+    This function handles multiple content formats:
+    - String: Returns as-is
+    - Dict with 'text' field: Extracts the text value
+    - List of content blocks: Extracts text from all blocks with type='text'
+    - Other types: Converts to string
+
+    Args:
+        content: The content object from an LLM response (can be str, dict, list, etc.)
+
+    Returns:
+        str: Extracted plain text content
+    """
+    # Handle dict format (e.g., {'text': 'answer'})
+    if isinstance(content, dict):
+        if 'text' in content:
+            return str(content['text'])
+        else:
+            print(f"[WARNING] Content was dict without 'text' field, converting to string")
+            return str(content)
+
+    # Handle list format (e.g., [{'type': 'text', 'text': 'answer'}])
+    elif isinstance(content, list):
+        text_parts = []
+        for item in content:
+            if isinstance(item, dict):
+                # Look for items with type='text' and extract the 'text' field
+                if item.get('type') == 'text':
+                    text_parts.append(str(item.get('text', '')))
+                # Fallback: if there's a 'text' field but no type, use it
+                elif 'text' in item:
+                    text_parts.append(str(item['text']))
+            elif isinstance(item, str):
+                text_parts.append(item)
+            else:
+                text_parts.append(str(item))
+
+        result = ' '.join(text_parts)
+        if len(content) > 1 or (len(content) == 1 and isinstance(content[0], dict)):
+            print(f"[INFO] Extracted text from list with {len(content)} item(s)")
+        return result
+
+    # Handle string format (already plain text)
+    elif isinstance(content, str):
+        return content
+
+    # Fallback for other types
+    else:
+        print(f"[WARNING] Content was {type(content)}, converting to string")
+        return str(content)
+
+
 def cleanup_answer(answer: Any) -> str:
     """
     Clean up the agent answer to ensure it's in plain text format.

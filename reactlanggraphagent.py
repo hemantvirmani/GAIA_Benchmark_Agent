@@ -15,7 +15,7 @@ from langchain_core.messages import HumanMessage
 
 from custom_tools import get_custom_tools_list
 from system_prompt import SYSTEM_PROMPT
-from utils import cleanup_answer
+from utils import cleanup_answer, extract_text_from_content
 import config
 
 # Suppress BeautifulSoup GuessedAtParserWarning
@@ -63,7 +63,7 @@ class ReActLangGraphAgent:
         agent_graph = create_react_agent(
             model=self.llm,
             tools=self.tools,
-            state_modifier=SYSTEM_PROMPT  # System prompt is added as state modifier
+            prompt=SYSTEM_PROMPT  # System prompt is added via the prompt parameter
         )
 
         return agent_graph
@@ -140,9 +140,17 @@ class ReActLangGraphAgent:
 
             # Get the last message (the agent's final response)
             last_message = messages[-1]
-            answer = last_message.content if hasattr(last_message, 'content') else str(last_message)
 
-            if answer is None:
+            # Extract content from the message
+            if hasattr(last_message, 'content'):
+                content = last_message.content
+            else:
+                content = str(last_message)
+
+            # Use utility function to extract text from various content formats
+            answer = extract_text_from_content(content)
+
+            if not answer or answer is None:
                 print("[WARNING] Agent completed but returned None as answer")
                 return "Error: No answer generated"
 

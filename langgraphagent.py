@@ -21,7 +21,7 @@ from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
 from custom_tools import get_custom_tools_list
 from system_prompt import SYSTEM_PROMPT
-from utils import cleanup_answer
+from utils import cleanup_answer, extract_text_from_content
 import config
 
 # Suppress BeautifulSoup GuessedAtParserWarning
@@ -252,36 +252,14 @@ class LangGraphAgent:
             print(f"{'='*60}\n")
 
             answer = response.get("answer")
-            if answer is None:
+            if not answer or answer is None:
                 print("[WARNING] Agent completed but returned None as answer")
                 return "Error: No answer generated"
 
-            # Final safety check: ensure answer is plain text string
-            if isinstance(answer, dict):
-                # If it's a dict, try to extract text field
-                if 'text' in answer:
-                    answer = answer['text']
-                else:
-                    answer = str(answer)
-                print(f"[WARNING] Answer was dict, extracted: {answer[:100]}")
-            elif isinstance(answer, list):
-                # If it's a list, extract text from each item
-                text_parts = []
-                for item in answer:
-                    if isinstance(item, dict) and 'text' in item:
-                        text_parts.append(item['text'])
-                    else:
-                        text_parts.append(str(item))
-                answer = " ".join(text_parts)
-                print(f"[WARNING] Answer was list, extracted: {answer[:100]}")
-            elif not isinstance(answer, str):
-                # Convert to string if it's any other type
-                answer = str(answer)
-                print(f"[WARNING] Answer was {type(answer)}, converted to string")
+            # Use utility function to extract text from various content formats
+            answer = extract_text_from_content(answer)
 
-            answer = answer.strip()
-
-            # Clean up the answer using utility function
+            # Clean up the answer using utility function (includes stripping)
             answer = cleanup_answer(answer)
 
             print(f"[FINAL ANSWER] {answer}")
