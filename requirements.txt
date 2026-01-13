@@ -6,6 +6,7 @@ ddgs
 pytz
 wikipedia
 arxiv
+langchain
 langgraph
 langchain-core
 langchain-google-genai

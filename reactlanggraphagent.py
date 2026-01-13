@@ -9,10 +9,9 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)
 warnings.filterwarnings('ignore', module='tensorflow')
 warnings.filterwarnings('ignore', module='tf_keras')
 
-from langchain import hub
-from langchain.agents import create_react_agent, AgentExecutor
+from langgraph.prebuilt import create_react_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import PromptTemplate
+from langchain_core.messages import HumanMessage
 
 from custom_tools import get_custom_tools_list
 from system_prompt import SYSTEM_PROMPT
@@ -29,10 +28,11 @@ except ImportError:
 
 class ReActLangGraphAgent:
     """
-    ReAct agent implementation using LangChain's create_react_agent function.
+    ReAct agent implementation using LangGraph's create_react_agent function.
 
     This agent uses the ReAct (Reasoning + Acting) pattern where the agent
     reasons about what to do and then acts by calling tools iteratively.
+    Built on top of LangGraph's prebuilt ReAct agent.
     """
 
     def __init__(self):
@@ -42,7 +42,7 @@ class ReActLangGraphAgent:
 
         self.tools = get_custom_tools_list()
         self.llm = self._create_llm_client()
-        self.agent_executor = self._build_agent()
+        self.agent_graph = self._build_agent()
 
     def _create_llm_client(self):
         """Create and return the LLM client."""
@@ -55,71 +55,18 @@ class ReActLangGraphAgent:
             timeout=60
         )
 
-    def _create_react_prompt(self) -> PromptTemplate:
-        """
-        Create a custom ReAct prompt template that incorporates the system prompt.
+    def _build_agent(self):
+        """Build and return the ReAct agent graph using LangGraph's create_react_agent."""
 
-        Returns:
-            PromptTemplate: A prompt template for the ReAct agent
-        """
-        # Create a ReAct-style prompt that includes our system prompt
-        template = """
-{system_prompt}
-
-You have access to the following tools:
-
-{tools}
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question (PLAIN TEXT ONLY, NO EXTRA TEXT)
-
-CRITICAL: Your Final Answer must be PLAIN TEXT ONLY - just the answer itself with no additional text, markdown, or formatting.
-
-Begin!
-
-Question: {input}
-Thought: {agent_scratchpad}
-"""
-
-        return PromptTemplate(
-            template=template,
-            input_variables=["input", "agent_scratchpad", "tools", "tool_names"],
-            partial_variables={"system_prompt": SYSTEM_PROMPT}
-        )
-
-    def _build_agent(self) -> AgentExecutor:
-        """Build and return the ReAct agent executor."""
-
-        # Create custom prompt
-        prompt = self._create_react_prompt()
-
-        # Create the ReAct agent using create_react_agent
-        agent = create_react_agent(
-            llm=self.llm,
+        # LangGraph's create_react_agent returns a compiled graph
+        # It automatically handles the ReAct loop with tools
+        agent_graph = create_react_agent(
+            model=self.llm,
             tools=self.tools,
-            prompt=prompt
+            state_modifier=SYSTEM_PROMPT  # System prompt is added as state modifier
         )
 
-        # Create agent executor with configuration
-        agent_executor = AgentExecutor(
-            agent=agent,
-            tools=self.tools,
-            verbose=True,
-            max_iterations=40,  # Match the step limit from LangGraphAgent
-            max_execution_time=None,
-            handle_parsing_errors=True,
-            return_intermediate_steps=False
-        )
-
-        return agent_executor
+        return agent_graph
 
     def __call__(self, question: str, file_name: str = None) -> str:
         """
@@ -146,13 +93,17 @@ Thought: {agent_scratchpad}
             if file_name:
                 question_content += f'\n\nNote: This question references a file: {file_name}'
 
-            # Invoke the agent executor with retry logic for 504 errors
+            # Invoke the agent graph with retry logic for 504 errors
             max_retries = config.MAX_RETRIES
             delay = config.INITIAL_RETRY_DELAY
 
             for attempt in range(max_retries + 1):
                 try:
-                    response = self.agent_executor.invoke({"input": question_content})
+                    # LangGraph's create_react_agent expects messages as input
+                    response = self.agent_graph.invoke(
+                        {"messages": [HumanMessage(content=question_content)]},
+                        config={"recursion_limit": 80}  # Match the recursion limit from LangGraphAgent
+                    )
                     # Success - break out of retry loop
                     break
                 except Exception as e:
@@ -180,7 +131,16 @@ Thought: {agent_scratchpad}
             print(f"{'='*60}\n")
 
             # Extract the answer from the response
-            answer = response.get("output")
+            # LangGraph's create_react_agent returns the last message in the messages list
+            messages = response.get("messages", [])
+
+            if not messages:
+                print("[WARNING] Agent completed but returned no messages")
+                return "Error: No answer generated"
+
+            # Get the last message (the agent's final response)
+            last_message = messages[-1]
+            answer = last_message.content if hasattr(last_message, 'content') else str(last_message)
 
             if answer is None:
                 print("[WARNING] Agent completed but returned None as answer")
