@@ -21,6 +21,7 @@ from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
 from custom_tools import get_custom_tools_list
 from system_prompt import SYSTEM_PROMPT
+from utils import cleanup_answer
 import config
 
 # Suppress BeautifulSoup GuessedAtParserWarning
@@ -280,20 +281,8 @@ class LangGraphAgent:
 
             answer = answer.strip()
 
-            # Additional validation for numerical answers
-            # Remove common formatting issues that break exact matching
-            if answer:
-                # Remove comma separators from numbers (e.g., "1,000" -> "1000")
-                if ',' in answer and answer.replace(',', '').replace('.', '').isdigit():
-                    answer = answer.replace(',', '')
-                    print(f"[VALIDATION] Removed comma separators from answer")
-
-                # Ensure no trailing/leading whitespace or punctuation
-                answer = answer.strip().rstrip('.')
-
-                # Log if answer looks suspicious (for debugging)
-                if any(char in answer for char in ['{', '}', '[', ']', '`', '*', '#']):
-                    print(f"[WARNING] Answer contains suspicious formatting characters: {answer[:100]}")
+            # Clean up the answer using utility function
+            answer = cleanup_answer(answer)
 
             print(f"[FINAL ANSWER] {answer}")
             return answer

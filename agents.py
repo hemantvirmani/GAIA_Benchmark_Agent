@@ -2,6 +2,7 @@
 
 import config
 from langgraphagent import LangGraphAgent
+from reactlanggraphagent import ReActLangGraphAgent
 
 
 class MyGAIAAgents:
@@ -17,6 +18,8 @@ class MyGAIAAgents:
 
         if active_agent == "LangGraph":
             self.agent = LangGraphAgent()
+        elif active_agent == "ReActLangGraph":
+            self.agent = ReActLangGraphAgent()
         else:
             # Default to LangGraph if unknown agent type
             print(f"[WARNING] Unknown agent type '{active_agent}', defaulting to LangGraph")

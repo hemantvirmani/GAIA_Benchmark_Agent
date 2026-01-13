@@ -4,7 +4,7 @@ import json
 import requests
 from typing import List, Dict
 import config
-from retry_utils import retry_with_backoff
+from utils import retry_with_backoff
 
 
 class QuestionLoader:

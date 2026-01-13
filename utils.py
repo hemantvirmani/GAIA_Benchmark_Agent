@@ -1,4 +1,4 @@
-"""Retry utilities with exponential backoff."""
+"""Utility functions for GAIA Benchmark Agent including retry logic and answer cleanup."""
 
 import time
 import requests
@@ -46,3 +46,37 @@ def retry_with_backoff(
 
         return wrapper
     return decorator
+
+
+def cleanup_answer(answer: Any) -> str:
+    """
+    Clean up the agent answer to ensure it's in plain text format.
+
+    This function:
+    - Converts answer to string
+    - Removes comma separators from numbers (e.g., "1,000" -> "1000")
+    - Strips whitespace and trailing punctuation
+    - Logs warnings for suspicious formatting characters
+
+    Args:
+        answer: The raw answer from the agent (can be str, dict, list, etc.)
+
+    Returns:
+        str: Cleaned up answer as plain text
+    """
+    # Convert to string and strip whitespace
+    answer = str(answer).strip()
+
+    # Remove comma separators from numbers (e.g., "1,000" -> "1000")
+    if ',' in answer and answer.replace(',', '').replace('.', '').isdigit():
+        answer = answer.replace(',', '')
+        print(f"[VALIDATION] Removed comma separators from answer")
+
+    # Ensure no trailing/leading whitespace or punctuation
+    answer = answer.strip().rstrip('.')
+
+    # Log if answer looks suspicious (for debugging)
+    if any(char in answer for char in ['{', '}', '[', ']', '`', '*', '#']):
+        print(f"[WARNING] Answer contains suspicious formatting characters: {answer[:100]}")
+
+    return answer
