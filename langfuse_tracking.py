@@ -15,9 +15,9 @@ from contextlib import contextmanager
 
 # Langfuse will be imported conditionally
 langfuse = None
+
 try:
-    from langfuse import Langfuse
-    from langfuse.decorators import observe, langfuse_context
+    from langfuse import Langfuse, observe
     LANGFUSE_AVAILABLE = True
 except ImportError:
     LANGFUSE_AVAILABLE = False
@@ -41,7 +41,7 @@ class LangfuseTracker:
         if self._client is None and LANGFUSE_AVAILABLE:
             public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
             secret_key = os.getenv("LANGFUSE_SECRET_KEY")
-            host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+            host = os.getenv("LANGFUSE_HOST", "https://us.cloud.langfuse.com")
 
             if public_key and secret_key:
                 self._client = Langfuse(
@@ -88,39 +88,42 @@ def track_agent_execution(agent_type: str):
         @functools.wraps(func)
         def wrapper(self, question: str, file_name: str = None, *args, **kwargs):
             # Add metadata to current observation
-            langfuse_context.update_current_observation(
-                metadata={
-                    "agent_type": agent_type,
-                    "has_file": file_name is not None,
-                    "file_name": file_name or "none",
-                    "question_length": len(question)
-                },
-                input={"question": question[:500], "file_name": file_name}  # Limit question length
-            )
+            if tracker.client:
+                tracker.client.update_current_span(
+                    metadata={
+                        "agent_type": agent_type,
+                        "has_file": file_name is not None,
+                        "file_name": file_name or "none",
+                        "question_length": len(question)
+                    },
+                    input={"question": question[:500], "file_name": file_name}  # Limit question length
+                )
 
             start_time = time.time()
             try:
                 result = func(self, question, file_name, *args, **kwargs)
 
                 # Update with output and success metrics
-                langfuse_context.update_current_observation(
-                    output={"answer": str(result)[:500]},  # Limit answer length
-                    metadata={
-                        "execution_time_seconds": time.time() - start_time,
-                        "success": not result.startswith("Error:")
-                    }
-                )
+                if tracker.client:
+                    tracker.client.update_current_span(
+                        output={"answer": str(result)[:500]},  # Limit answer length
+                        metadata={
+                            "execution_time_seconds": time.time() - start_time,
+                            "success": not result.startswith("Error:")
+                        }
+                    )
                 return result
             except Exception as e:
                 # Track errors
-                langfuse_context.update_current_observation(
-                    level="ERROR",
-                    status_message=str(e),
-                    metadata={
-                        "execution_time_seconds": time.time() - start_time,
-                        "error": str(e)
-                    }
-                )
+                if tracker.client:
+                    tracker.client.update_current_span(
+                        level="ERROR",
+                        status_message=str(e),
+                        metadata={
+                            "execution_time_seconds": time.time() - start_time,
+                            "error": str(e)
+                        }
+                    )
                 raise
 
         return wrapper
@@ -152,23 +155,25 @@ def track_llm_call(model_name: str):
                 result = func(*args, **kwargs)
 
                 # Update generation with model info
-                langfuse_context.update_current_observation(
-                    model=model_name,
-                    metadata={
-                        "latency_seconds": time.time() - start_time,
-                    }
-                )
+                if tracker.client:
+                    tracker.client.update_current_generation(
+                        model=model_name,
+                        metadata={
+                            "latency_seconds": time.time() - start_time,
+                        }
+                    )
 
                 return result
             except Exception as e:
-                langfuse_context.update_current_observation(
-                    level="ERROR",
-                    status_message=str(e),
-                    metadata={
-                        "latency_seconds": time.time() - start_time,
-                        "error": str(e)
-                    }
-                )
+                if tracker.client:
+                    tracker.client.update_current_generation(
+                        level="ERROR",
+                        status_message=str(e),
+                        metadata={
+                            "latency_seconds": time.time() - start_time,
+                            "error": str(e)
+                        }
+                    )
                 raise
 
         return wrapper
@@ -194,14 +199,15 @@ def track_tool_call(tool_name: str):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             # Capture input parameters
-            langfuse_context.update_current_observation(
-                input={
-                    "tool": tool_name,
-                    "args": args[:3] if args else [],  # Limit args
-                    "kwargs": {k: str(v)[:100] for k, v in list(kwargs.items())[:5]}  # Limit kwargs
-                },
-                metadata={"tool_name": tool_name}
-            )
+            if tracker.client:
+                tracker.client.update_current_span(
+                    input={
+                        "tool": tool_name,
+                        "args": args[:3] if args else [],  # Limit args
+                        "kwargs": {k: str(v)[:100] for k, v in list(kwargs.items())[:5]}  # Limit kwargs
+                    },
+                    metadata={"tool_name": tool_name}
+                )
 
             start_time = time.time()
             try:
@@ -209,27 +215,29 @@ def track_tool_call(tool_name: str):
 
                 # Track output
                 result_str = str(result)
-                langfuse_context.update_current_observation(
-                    output={
-                        "result_preview": result_str[:500],
-                        "result_length": len(result_str)
-                    },
-                    metadata={
-                        "execution_time_seconds": time.time() - start_time,
-                        "success": True
-                    }
-                )
+                if tracker.client:
+                    tracker.client.update_current_span(
+                        output={
+                            "result_preview": result_str[:500],
+                            "result_length": len(result_str)
+                        },
+                        metadata={
+                            "execution_time_seconds": time.time() - start_time,
+                            "success": True
+                        }
+                    )
 
                 return result
             except Exception as e:
-                langfuse_context.update_current_observation(
-                    level="ERROR",
-                    status_message=str(e),
-                    metadata={
-                        "execution_time_seconds": time.time() - start_time,
-                        "error": str(e)
-                    }
-                )
+                if tracker.client:
+                    tracker.client.update_current_span(
+                        level="ERROR",
+                        status_message=str(e),
+                        metadata={
+                            "execution_time_seconds": time.time() - start_time,
+                            "error": str(e)
+                        }
+                    )
                 raise
 
         return wrapper
@@ -253,17 +261,17 @@ def track_session(session_name: str, metadata: Optional[Dict[str, Any]] = None):
         yield
         return
 
-    trace = tracker.client.trace(
+    # Use start_as_current_span to create a root span/trace for the session
+    with tracker.client.start_as_current_span(
         name=session_name,
         metadata=metadata or {}
-    )
-
-    try:
-        yield trace
-    finally:
-        # Flush to ensure data is sent
-        if tracker.client:
-            tracker.client.flush()
+    ) as span:
+        try:
+            yield span
+        finally:
+            # Flush to ensure data is sent
+            if tracker.client:
+                tracker.client.flush()
 
 
 @contextmanager
@@ -283,16 +291,12 @@ def track_question_processing(task_id: str, question: str):
         yield None
         return
 
-    span = tracker.client.span(
+    with tracker.client.start_as_current_span(
         name=f"Question_{task_id[:8]}",
         input={"task_id": task_id, "question": question[:300]},
         metadata={"task_id": task_id}
-    )
-
-    try:
+    ) as span:
         yield span
-    finally:
-        span.end()
 
 
 # Convenience function for manual span creation
@@ -310,7 +314,7 @@ def create_span(name: str, input_data: Optional[Dict] = None, metadata: Optional
     if not tracker.enabled:
         return None
 
-    return langfuse_context.span(
+    return tracker.client.start_span(
         name=name,
         input=input_data,
         metadata=metadata
