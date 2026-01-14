@@ -22,9 +22,10 @@ from scorer import question_scorer
 # Import new utilities
 from question_loader import QuestionLoader
 from result_formatter import ResultFormatter
-from agent_runner import AgentRunner  
+from agent_runner import AgentRunner
 from validators import InputValidator, ValidationError
 from utils import retry_with_backoff
+from langfuse_tracking import track_session
 
 # --- Run Modes ---
 class RunMode(Enum):
@@ -147,8 +148,14 @@ def run_and_submit_all(username: str, active_agent: str = None) -> tuple:
     except ValidationError as e:
         return f"Invalid questions data: {e}", None
 
-    # Run agent on all questions with specified agent type
-    results = AgentRunner(active_agent=active_agent).run_on_questions(questions_data)
+    # Run agent on all questions with specified agent type (with Langfuse session tracking)
+    with track_session("Submit_All", {
+        "agent": active_agent or config.ACTIVE_AGENT,
+        "username": username,
+        "question_count": len(questions_data),
+        "mode": "submission"
+    }):
+        results = AgentRunner(active_agent=active_agent).run_on_questions(questions_data)
 
     if results is None:
         return "Error initializing agent.", None
@@ -276,8 +283,14 @@ def run_test_code(filter=None, active_agent=None) -> pd.DataFrame:
         questions_to_process = questions_data
         logs_for_display.append(f"Testing all {len(questions_to_process)} questions")
 
-    # Run agent on selected questions with specified agent type
-    results = AgentRunner(active_agent=active_agent).run_on_questions(questions_to_process)
+    # Run agent on selected questions with specified agent type (with Langfuse session tracking)
+    with track_session("Test_Run", {
+        "agent": active_agent or config.ACTIVE_AGENT,
+        "question_count": len(questions_to_process),
+        "filter": str(filter) if filter else "all",
+        "mode": "test"
+    }):
+        results = AgentRunner(active_agent=active_agent).run_on_questions(questions_to_process)
 
     if results is None:
         return pd.DataFrame(["Error initializing agent."])

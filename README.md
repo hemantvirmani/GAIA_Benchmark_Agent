@@ -34,6 +34,7 @@ A LangGraph-based AI agent designed to solve questions from the GAIA (General AI
 - **Mathematical Operations**: Basic arithmetic and modulus operations
 - **Gradio Interface**: User-friendly web UI for testing and evaluation
 - **Automated Evaluation**: Fetches questions from API, processes them, and submits answers
+- **Observability**: Built-in integration with Langfuse for tracking traces and metrics
 
 ## Project Structure
 
@@ -66,6 +67,11 @@ pip install -r requirements.txt
 ```bash
 export GOOGLE_API_KEY="your_google_api_key"
 export HUGGINGFACEHUB_API_TOKEN="your_hf_token"  # Optional.  not yet used
+
+# Langfuse Observability (Optional)
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+export LANGFUSE_SECRET_KEY="sk-lf-..."
+export LANGFUSE_HOST="https://cloud.langfuse.com" # Optional
 ```
 
 ## Requirements

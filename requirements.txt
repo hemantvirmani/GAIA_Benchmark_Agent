@@ -26,3 +26,4 @@ markdownify
 numpy
 pandas
 colorama
+langfuse

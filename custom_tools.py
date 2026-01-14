@@ -15,6 +15,7 @@ from langchain_community.document_loaders import ArxivLoader
 from youtube_transcript_api import YouTubeTranscriptApi
 from pytube import extract
 from langchain_core.tools import tool
+from langfuse_tracking import track_tool_call
 
 import pandas as pd
 import speech_recognition as sr
@@ -121,9 +122,10 @@ def _get_mime_type(file_name: str) -> str:
 # ============================================================================
 
 @tool
+@track_tool_call("add")
 def add(a: float, b: float) -> str:
     """Add two numbers.
-    
+
     Args:
         a: first int
         b: second int
@@ -131,9 +133,10 @@ def add(a: float, b: float) -> str:
     return str(a + b)
 
 @tool
+@track_tool_call("subtract")
 def subtract(a: float, b: float) -> str:
     """Subtract b from a.
-        
+
     Args:
         a: first int
         b: second int
@@ -141,9 +144,10 @@ def subtract(a: float, b: float) -> str:
     return str(a - b)
 
 @tool
+@track_tool_call("multiply")
 def multiply(a: float, b: float) -> str:
     """Multiply two numbers.
-    
+
     Args:
         a: first int
         b: second int
@@ -151,18 +155,20 @@ def multiply(a: float, b: float) -> str:
     return str(a * b)
 
 @tool
+@track_tool_call("divide")
 def divide(a: float, b: float) -> str:
     """Divide a by b.
-    
+
     Args:
         a: first int
-        b: second int    
+        b: second int
     """
     if b == 0:
         return "Cannot divide by zero"
     return str(a / b)
 
 @tool
+@track_tool_call("power")
 def power(a: float, b: float) -> str:
     """Raise a to the power of b.
 
@@ -173,9 +179,10 @@ def power(a: float, b: float) -> str:
     return str(a ** b)
 
 @tool
+@track_tool_call("modulus")
 def modulus(a: int, b: int) -> int:
     """Get the modulus of two numbers.
-    
+
     Args:
         a: first int
         b: second int
@@ -183,6 +190,7 @@ def modulus(a: int, b: int) -> int:
     return a % b
 
 @tool
+@track_tool_call("string_reverse")
 def string_reverse(input_string: str) -> str:
     """
     Reverses the input string. Useful whenever a string seems to be non-sensical or
@@ -199,6 +207,7 @@ def string_reverse(input_string: str) -> str:
 
 
 @tool
+@track_tool_call("get_current_time_in_timezone")
 def get_current_time_in_timezone(timezone: str) -> str:
     """A tool that fetches the current local time in a specified timezone.
     Args:
@@ -214,6 +223,7 @@ def get_current_time_in_timezone(timezone: str) -> str:
         return f"Error fetching time for timezone '{timezone}': {str(e)}"
 
 @tool
+@track_tool_call("websearch")
 def websearch(query: str) -> str:
     """This tool will search the web using DuckDuckGo.
 
@@ -233,9 +243,10 @@ def websearch(query: str) -> str:
         return f"Search error (try again): {str(e)}"
 
 @tool
+@track_tool_call("wiki_search")
 def wiki_search(query: str) -> str:
     """Search Wikipedia for a query and return maximum 3 results.
-    
+
     Args:
         query: The search query."""
     try:
@@ -253,9 +264,10 @@ def wiki_search(query: str) -> str:
         return f"Error performing wikipedia search: {e}. try again."
 
 @tool
+@track_tool_call("arvix_search")
 def arvix_search(query: str) -> str:
     """Search Arxiv for a query and return maximum 3 result.
-    
+
     Args:
         query: The search query."""
     try:
@@ -274,6 +286,7 @@ def arvix_search(query: str) -> str:
         return f"Error performing arxiv search: {e}. try again."
 
 @tool
+@track_tool_call("get_youtube_transcript")
 def get_youtube_transcript(page_url: str) -> str:
     """Get the transcript of a YouTube video
 
@@ -300,6 +313,7 @@ def get_youtube_transcript(page_url: str) -> str:
         return msg
 
 @tool
+@track_tool_call("get_webpage_content")
 def get_webpage_content(page_url: str) -> str:
     """Load a web page and return it as markdown if possible
 
@@ -335,6 +349,7 @@ def get_webpage_content(page_url: str) -> str:
         return f"get_webpage_content failed: {e}"
 
 @tool
+@track_tool_call("read_excel_file")
 def read_excel_file(file_name: str) -> str:
     """
     Reads an Excel file (.xlsx) and returns its content as a Markdown table.
@@ -363,6 +378,7 @@ def read_excel_file(file_name: str) -> str:
         return f"Error: Failed to read the Excel file. Reason: {e}"
 
 @tool
+@track_tool_call("read_python_script")
 def read_python_script(file_name: str) -> str:
     """
     Reads the source code of a Python script.
@@ -390,6 +406,7 @@ def read_python_script(file_name: str) -> str:
         return f"Error: Failed to read the Python script. Reason: {e}"
 
 @tool
+@track_tool_call("parse_audio_file")
 def parse_audio_file(file_name: str) -> str:
     """
     Transcribes audio from an MP3 file into text.
@@ -432,6 +449,7 @@ def parse_audio_file(file_name: str) -> str:
         return f"Error: Failed to parse the audio file. Reason: {e}"
 
 @tool
+@track_tool_call("analyze_youtube_video")
 def analyze_youtube_video(question: str, youtube_url: str) -> str:
     """
     Uses a multimodal AI model to analyze a YouTube video and answer a specific question.
@@ -473,6 +491,7 @@ def analyze_youtube_video(question: str, youtube_url: str) -> str:
         return error_msg
 
 @tool
+@track_tool_call("analyze_image")
 def analyze_image(question: str, file_name: str) -> str:
     """
     Analyzes an image file and answers a specific question about it using AI vision.
