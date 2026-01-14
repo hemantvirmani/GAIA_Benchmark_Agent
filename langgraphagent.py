@@ -234,7 +234,7 @@ class LangGraphAgent:
         """
 
         print(f"\n{'='*60}")
-        print(f"[AGENT START] Question: {question}")
+        print(f"[LANGGRAPH AGENT START] Question: {question}")
         if file_name:
             print(f"[FILE] {file_name}")
         print(f"{'='*60}")
@@ -248,7 +248,7 @@ class LangGraphAgent:
             )
 
             elapsed_time = time.time() - start_time
-            print(f"[AGENT COMPLETE] Time: {elapsed_time:.2f}s")
+            print(f"[LANGGRAPH AGENT COMPLETE] Time: {elapsed_time:.2f}s")
             print(f"{'='*60}\n")
 
             answer = response.get("answer")
@@ -267,6 +267,6 @@ class LangGraphAgent:
 
         except Exception as e:
             elapsed_time = time.time() - start_time
-            print(f"[AGENT ERROR] Failed after {elapsed_time:.2f}s: {e}")
+            print(f"[LANGGRAPH AGENT ERROR] Failed after {elapsed_time:.2f}s: {e}")
             print(f"{'='*60}\n")
             return f"Error: {str(e)[:100]}"

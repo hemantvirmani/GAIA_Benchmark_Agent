@@ -234,12 +234,14 @@ def _verify_answers(results: list, log_output: list, runtime: tuple = None) -> N
             log_output.append(f"Runtime: {minutes}m {seconds}s")
         log_output.append("=" * config.SEPARATOR_WIDTH)
 
-def run_test_code(filter=None) -> pd.DataFrame:
+def run_test_code(filter=None, active_agent=None) -> pd.DataFrame:
     """Run test code on selected questions.
 
     Args:
         filter: Optional tuple/list of question indices to test (e.g., (4, 7, 15)).
                 If None, processes all questions.
+        active_agent: Optional agent type to use (e.g., "LangGraph", "ReActLangGraph", "LLamaIndex").
+                      If None, uses config.ACTIVE_AGENT.
 
     Returns:
         pd.DataFrame: Results and verification output
@@ -274,8 +276,8 @@ def run_test_code(filter=None) -> pd.DataFrame:
         questions_to_process = questions_data
         logs_for_display.append(f"Testing all {len(questions_to_process)} questions")
 
-    # Run agent on selected questions
-    results = AgentRunner().run_on_questions(questions_to_process)
+    # Run agent on selected questions with specified agent type
+    results = AgentRunner(active_agent=active_agent).run_on_questions(questions_to_process)
 
     if results is None:
         return pd.DataFrame(["Error initializing agent."])
@@ -296,7 +298,24 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run the agent application.")
     parser.add_argument("--test", type=str, nargs='?', const='default', help="Run local tests on selected questions and exit. Optionally provide comma-separated question indices (e.g., --test 2,4,6). If no indices provided, uses default test questions.")
     parser.add_argument("--testall", action="store_true", help="Run local tests on all questions and exit.")
+    parser.add_argument("--agent", type=str, choices=['langgraph', 'reactlangg', 'llamaindex'], help="Agent to use in CLI mode (case-insensitive). Options: langgraph, react langgraph, llamaindex. Default: uses config.ACTIVE_AGENT")
     args = parser.parse_args()
+
+    # Map agent name to config constant (case-insensitive)
+    agent_mapping = {
+        'langgraph': config.AGENT_LANGGRAPH,
+        'reactlangg': config.AGENT_REACT_LANGGRAPH,
+        'llamaindex': config.AGENT_LLAMAINDEX,
+    }
+
+    active_agent = None
+    if args.agent:
+        agent_key = args.agent.lower()
+        active_agent = agent_mapping.get(agent_key)
+        if not active_agent:
+            print(f"Error: Unknown agent '{args.agent}'. Valid options: langgraph, react, llamaindex")
+            return
+        print(f"[CLI] Using agent: {active_agent}")
 
     print(f"\n{'-' * 30} App Starting {'-' * 30}")
 
@@ -347,7 +366,7 @@ def main() -> None:
             test_filter = None  # Test all questions
 
         print(f"Running test code on {len(test_filter) if test_filter else 'ALL'} questions (CLI mode)...")
-        result = run_test_code(filter=test_filter)
+        result = run_test_code(filter=test_filter, active_agent=active_agent)
 
         # Print results
         if isinstance(result, pd.DataFrame):
