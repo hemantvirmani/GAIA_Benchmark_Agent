@@ -53,6 +53,7 @@ def extract_text_from_content(content: Any) -> str:
     Extract plain text from various content formats returned by LLM agents.
 
     This function handles multiple content formats:
+    - ChatMessage objects (LlamaIndex): Extracts the content attribute
     - String: Returns as-is
     - Dict with 'text' field: Extracts the text value
     - List of content blocks: Extracts text from all blocks with type='text'
@@ -64,6 +65,16 @@ def extract_text_from_content(content: Any) -> str:
     Returns:
         str: Extracted plain text content
     """
+    # Handle LlamaIndex ChatMessage objects
+    try:
+        from llama_index.core.base.llms.types import ChatMessage
+        if isinstance(content, ChatMessage):
+            # Extract just the content attribute (without role prefix)
+            return str(content.content)
+    except ImportError:
+        # LlamaIndex not installed, skip this check
+        pass
+
     # Handle dict format (e.g., {'text': 'answer'})
     if isinstance(content, dict):
         if 'text' in content:

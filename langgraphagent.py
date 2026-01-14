@@ -58,7 +58,7 @@ class LangGraphAgent:
             apikey = os.getenv("GOOGLE_API_KEY")
 
             return ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",  # Changed from gemini-2.5-flash-lite - better tool calling
+                model=config.ACTIVE_AGENT_LLM_MODEL,
                 temperature=0,
                 api_key=apikey,
                 timeout=60  # Add timeout to prevent hanging

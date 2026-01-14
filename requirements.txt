@@ -12,6 +12,9 @@ langchain-core
 langchain-google-genai
 langchain-huggingface
 langchain-community
+llama-index
+llama-index-llms-gemini
+llama-index-core
 pypdf
 youtube-transcript-api
 pytube

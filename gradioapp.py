@@ -26,6 +26,10 @@ def _run_and_submit_react(profile: gr.OAuthProfile | None = None):
     """Run and submit with ReActLangGraph agent."""
     return _run_and_submit_all_local(profile, active_agent=config.AGENT_REACT_LANGGRAPH)
 
+def _run_and_submit_llamaindex(profile: gr.OAuthProfile | None = None):
+    """Run and submit with LlamaIndex agent."""
+    return _run_and_submit_all_local(profile, active_agent=config.AGENT_LLAMAINDEX)
+
 
 def create_ui(run_and_submit_all, run_test_code):
     """Create the Main App with custom layout to include LoginButton"""
@@ -56,6 +60,7 @@ def create_ui(run_and_submit_all, run_test_code):
         with gr.Row():
             run_button_langgraph = gr.Button("Run with LangGraph Agent", variant="primary")
             run_button_react = gr.Button("Run with ReAct Agent", variant="secondary")
+            run_button_llamaindex = gr.Button("Run with LlamaIndex Agent", variant="secondary")
 
         status_output = gr.Textbox(label="Run Status / Submission Result", lines=5, interactive=False)
         # Removed max_rows=10 from DataFrame constructor
@@ -68,6 +73,11 @@ def create_ui(run_and_submit_all, run_test_code):
 
         run_button_react.click(
             fn=_run_and_submit_react,
+            outputs=[status_output, results_table]
+        )
+
+        run_button_llamaindex.click(
+            fn=_run_and_submit_llamaindex,
             outputs=[status_output, results_table]
         )
         

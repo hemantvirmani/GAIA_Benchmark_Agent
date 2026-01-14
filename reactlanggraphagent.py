@@ -49,7 +49,7 @@ class ReActLangGraphAgent:
         apikey = os.getenv("GOOGLE_API_KEY")
 
         return ChatGoogleGenerativeAI(
-            model=config.GEMINI_MODEL,
+            model=config.ACTIVE_AGENT_LLM_MODEL,
             temperature=config.GEMINI_TEMPERATURE,
             api_key=apikey,
             timeout=60

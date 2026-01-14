@@ -3,6 +3,7 @@
 import config
 from langgraphagent import LangGraphAgent
 from reactlanggraphagent import ReActLangGraphAgent
+from llamaindexagent import LlamaIndexAgent
 
 
 class MyGAIAAgents:
@@ -26,6 +27,8 @@ class MyGAIAAgents:
             self.agent = LangGraphAgent()
         elif active_agent == config.AGENT_REACT_LANGGRAPH:
             self.agent = ReActLangGraphAgent()
+        elif active_agent == config.AGENT_LLAMAINDEX:
+            self.agent = LlamaIndexAgent()
         else:
             # Default to LangGraph if unknown agent type
             print(f"[WARNING] Unknown agent type '{active_agent}', defaulting to {config.AGENT_LANGGRAPH}")
