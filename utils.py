@@ -53,6 +53,7 @@ def extract_text_from_content(content: Any) -> str:
     Extract plain text from various content formats returned by LLM agents.
 
     This function handles multiple content formats:
+    - AgentOutput objects (LlamaIndex): Extracts the response attribute
     - Message objects with 'content' attribute: Extracts the content attribute
       (works for LlamaIndex ChatMessage, LangChain AIMessage, etc.)
     - String: Returns as-is
@@ -66,6 +67,18 @@ def extract_text_from_content(content: Any) -> str:
     Returns:
         str: Extracted plain text content
     """
+    # Handle LlamaIndex AgentOutput objects (has 'response' attribute)
+    if hasattr(content, 'response') and not isinstance(content, (str, dict, list)):
+        # Extract the response attribute from AgentOutput
+        response = content.response
+        # The response might itself be a message object with 'content'
+        if hasattr(response, 'content'):
+            return str(response.content)
+        elif hasattr(response, 'message') and hasattr(response.message, 'content'):
+            return str(response.message.content)
+        else:
+            return str(response)
+
     # Handle message objects with 'content' attribute (e.g., ChatMessage from various frameworks)
     # This works for LlamaIndex ChatMessage, LangChain AIMessage, etc.
     if hasattr(content, 'content') and not isinstance(content, (str, dict, list)):
@@ -119,7 +132,7 @@ def cleanup_answer(answer: Any) -> str:
     - Converts answer to string
     - Removes comma separators from numbers (e.g., "1,000" -> "1000")
     - Strips whitespace and trailing punctuation
-    - Logs warnings for suspicious formatting characters
+    - Logs warnings for verbose or malformatted answers
 
     Args:
         answer: The raw answer from the agent (can be str, dict, list, etc.)
@@ -137,6 +150,11 @@ def cleanup_answer(answer: Any) -> str:
 
     # Ensure no trailing/leading whitespace or punctuation
     answer = answer.strip().rstrip('.')
+
+    # Log if answer looks verbose (agent not following instructions)
+    if len(answer) > 100:
+        print(f"[WARNING] Answer appears verbose ({len(answer)} chars). Agent may not be following SYSTEM_PROMPT instructions.")
+        print(f"[WARNING] First 150 chars: {answer[:150]}...")
 
     # Log if answer looks suspicious (for debugging)
     if any(char in answer for char in ['{', '}', '[', ']', '`', '*', '#']):

@@ -130,7 +130,8 @@ class LlamaIndexAgent:
                 try:
                     # Create a dedicated async function to run the agent
                     async def run_agent_async():
-                        return await self.agent.run(question_content)
+                        # Pass max_iterations as a runtime parameter to the workflow
+                        return await self.agent.run(question_content, max_iterations=40)
 
                     # Try different approaches to run the async function
                     try:
@@ -180,6 +181,17 @@ class LlamaIndexAgent:
             if not answer or answer is None:
                 print("[WARNING] Agent completed but returned Empty answer")
                 return "Error: No answer generated"
+
+            # LlamaIndex ReActAgent may wrap answers in verbose format
+            # Check if the response starts with common verbose patterns and extract the core answer
+            import re
+
+            # Pattern 1: "Answer: X" or "Final Answer: X" from ReAct format
+            react_answer_match = re.search(r'(?:Final\s+)?Answer:\s*(.+)', answer, re.IGNORECASE | re.DOTALL)
+            if react_answer_match:
+                extracted = react_answer_match.group(1).strip()
+                print(f"[LLAMAINDEX] Extracted answer from ReAct format: '{extracted[:100]}...'")
+                answer = extracted
 
             # Clean up the answer using utility function (includes stripping)
             answer = cleanup_answer(answer)
