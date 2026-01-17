@@ -14,6 +14,14 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)
 warnings.filterwarnings('ignore', module='tensorflow')
 warnings.filterwarnings('ignore', module='tf_keras')
 
+# Suppress google.generativeai deprecation warning from llama_index
+warnings.filterwarnings('ignore', message='.*google.generativeai.*deprecated.*', category=FutureWarning)
+warnings.filterwarnings('ignore', module='google.generativeai')
+
+# Suppress asyncio selector warnings that occur during event loop cleanup on some platforms
+warnings.filterwarnings('ignore', message='.*Invalid file descriptor.*')
+logging.getLogger('asyncio').setLevel(logging.ERROR)
+
 from llama_index.core.agent import ReActAgent
 from llama_index.llms.gemini import Gemini
 from llama_index.core.tools import FunctionTool
@@ -138,17 +146,19 @@ class LlamaIndexAgent:
                     # Try different approaches to run the async function
                     try:
                         # Check if a loop is already running
-                        asyncio.get_running_loop()
+                        loop = asyncio.get_running_loop()
                         # If we reach here, a loop is already running
-                        # Run in a separate thread to avoid "event loop already running" error
-                        import concurrent.futures
-                        with concurrent.futures.ThreadPoolExecutor() as executor:
-                            response = executor.submit(
-                                lambda: asyncio.run(run_agent_async())
-                            ).result()
+                        # Use nest_asyncio's patched loop to run coroutine
+                        response = loop.run_until_complete(run_agent_async())
                     except RuntimeError:
                         # No running loop, we can use asyncio.run directly
-                        response = asyncio.run(run_agent_async())
+                        # But wrap in try-except to suppress cleanup errors
+                        try:
+                            response = asyncio.run(run_agent_async())
+                        except ValueError as ve:
+                            # Suppress "Invalid file descriptor" errors during cleanup
+                            if "Invalid file descriptor" not in str(ve):
+                                raise
 
                     # Success - break out of retry loop
                     break

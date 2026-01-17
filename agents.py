@@ -1,9 +1,9 @@
 """Agent wrapper module for GAIA Benchmark."""
 
 import config
-from langgraphagent import LangGraphAgent
-from reactlanggraphagent import ReActLangGraphAgent
-from llamaindexagent import LlamaIndexAgent
+
+# All agents are imported lazily to avoid loading unnecessary dependencies
+# and suppress warnings from unused agent implementations
 
 
 class MyGAIAAgents:
@@ -24,14 +24,18 @@ class MyGAIAAgents:
             active_agent = config.ACTIVE_AGENT
 
         if active_agent == config.AGENT_LANGGRAPH:
+            from langgraphagent import LangGraphAgent
             self.agent = LangGraphAgent()
         elif active_agent == config.AGENT_REACT_LANGGRAPH:
+            from reactlanggraphagent import ReActLangGraphAgent
             self.agent = ReActLangGraphAgent()
         elif active_agent == config.AGENT_LLAMAINDEX:
+            from llamaindexagent import LlamaIndexAgent
             self.agent = LlamaIndexAgent()
         else:
             # Default to LangGraph if unknown agent type
             print(f"[WARNING] Unknown agent type '{active_agent}', defaulting to {config.AGENT_LANGGRAPH}")
+            from langgraphagent import LangGraphAgent
             self.agent = LangGraphAgent()
 
     def __call__(self, question: str, file_name: str = None) -> str:

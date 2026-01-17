@@ -4,11 +4,17 @@ import requests
 import pandas as pd
 import json
 import time
+import warnings
+import logging
 from enum import Enum
 from colorama import init
 
 # Initialize colorama for Windows compatibility
 init(autoreset=True)
+
+# Suppress asyncio event loop cleanup warnings (common on HF Spaces)
+warnings.filterwarnings('ignore', message='.*Invalid file descriptor.*')
+logging.getLogger('asyncio').setLevel(logging.ERROR)
 
 # Import configuration
 import config
