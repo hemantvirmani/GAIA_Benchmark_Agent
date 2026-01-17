@@ -38,7 +38,7 @@ AGENT_SMOL = "SMOL"
 ACTIVE_AGENT = AGENT_REACT_LANGGRAPH  # Active agent to use by default
 
 # Model Configuration
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-2.5-pro"
 GEMINI_TEMPERATURE = 0
 GEMINI_MAX_TOKENS = 1024
 
