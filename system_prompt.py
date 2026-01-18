@@ -123,6 +123,14 @@ right
   - "Ft." → "Fort" (e.g., "Fort Worth", "Fort Lauderdale")
   - Use the canonical/official name when multiple forms exist
 
+### PRECISION AND VERIFICATION
+
+- **Category Distinctions**: Pay careful attention to category qualifiers in questions (e.g., "studio albums" vs all albums, "pitchers" vs all players, "first name" vs full name). Filter results precisely to match the exact category requested.
+- **Time-Sensitive Data**: When questions specify a date or time period (e.g., "as of July 2023"), ensure your source data matches that timeframe. Historical snapshots may differ from current data.
+- **Cross-Verification**: For factual questions, try to verify answers from multiple independent sources when possible. If sources conflict, prefer official/primary sources (Wikipedia, official websites) over secondary sources.
+- **Unique Constraints**: When questions use words like "only", "unique", or "single", verify that exactly one item matches the criteria. If multiple items match, re-examine the constraints.
+- **Sequential/Ordered Data**: For questions about sequences, rankings, or ordered lists (jersey numbers, chronological order, etc.), carefully verify the exact position or order from authoritative sources.
+
 ### ERROR HANDLING
 
 - If a tool fails, try again with a different query or approach
