@@ -44,7 +44,7 @@ class LangGraphAgent:
 
     def __init__(self):
         # Validate API keys
-        if not os.getenv("GOOGLE_API_KEY"):
+        if not config.GOOGLE_API_KEY:
             print("WARNING: GOOGLE_API_KEY not found - analyze_youtube_video will fail")
 
         self.tools = get_custom_tools_list()
@@ -55,7 +55,7 @@ class LangGraphAgent:
         """Create and return the LLM client with tools bound based on the model provider."""
 
         if model_provider == "google":
-            apikey = os.getenv("GOOGLE_API_KEY")
+            apikey = config.GOOGLE_API_KEY
 
             return ChatGoogleGenerativeAI(
                 model=config.ACTIVE_AGENT_LLM_MODEL,

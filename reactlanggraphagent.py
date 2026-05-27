@@ -37,7 +37,7 @@ class ReActLangGraphAgent:
 
     def __init__(self):
         # Validate API keys
-        if not os.getenv("GOOGLE_API_KEY"):
+        if not config.GOOGLE_API_KEY:
             print("WARNING: GOOGLE_API_KEY not found - analyze_youtube_video will fail")
 
         self.tools = get_custom_tools_list()
@@ -46,7 +46,7 @@ class ReActLangGraphAgent:
 
     def _create_llm_client(self):
         """Create and return the LLM client."""
-        apikey = os.getenv("GOOGLE_API_KEY")
+        apikey = config.GOOGLE_API_KEY
 
         return ChatGoogleGenerativeAI(
             model=config.ACTIVE_AGENT_LLM_MODEL,

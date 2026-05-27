@@ -445,7 +445,7 @@ def analyze_youtube_video(question: str, youtube_url: str) -> str:
     try:
         print(f"analyze_youtube_video called: {youtube_url} with question: {question}")
 
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key = config.GOOGLE_API_KEY
         if not api_key:
             return "Error: GOOGLE_API_KEY environment variable not set"
 
@@ -489,7 +489,7 @@ def analyze_image(question: str, file_name: str) -> str:
     try:
         print(f"analyze_image called: {file_name} with question: {question}")
 
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key = config.GOOGLE_API_KEY
         if not api_key:
             return "Error: GOOGLE_API_KEY environment variable not set"
 

@@ -27,7 +27,7 @@ SEPARATOR_WIDTH = 60  # Width of separator lines
 # Environment Variables
 SPACE_HOST = os.getenv("SPACE_HOST")
 SPACE_ID = os.getenv("SPACE_ID")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_DESKGENIE_KEY")
 
 # Agent Type Constants
 AGENT_LANGGRAPH = "LangGraph"
