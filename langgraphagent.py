@@ -62,7 +62,7 @@ class LangGraphAgent:
                 temperature=0,
                 api_key=apikey,
                 thinking_budget=0,
-                timeout=60  # Add timeout to prevent hanging
+                timeout=120
                 ).bind_tools(self.tools)
 
         elif model_provider == "huggingface":

@@ -52,7 +52,8 @@ class ReActLangGraphAgent:
             model=config.ACTIVE_AGENT_LLM_MODEL,
             temperature=config.GEMINI_TEMPERATURE,
             api_key=apikey,
-            timeout=60
+            thinking_budget=0,
+            timeout=120
         )
 
     def _build_agent(self):
