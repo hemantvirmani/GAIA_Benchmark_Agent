@@ -170,66 +170,31 @@ def _get_mime_type(file_name: str) -> str:
 # ============================================================================
 
 @tool
-def add(a: float, b: float) -> str:
-    """Add two numbers.
+def calculate(operation: str, a: float, b: float) -> str:
+    """Perform a basic arithmetic operation on two numbers.
 
     Args:
-        a: first int
-        b: second int
+        operation (str): One of 'add', 'subtract', 'multiply', 'divide', 'power', 'modulus'.
+        a (float): First number.
+        b (float): Second number.
     """
-    return str(a + b)
-
-@tool
-def subtract(a: float, b: float) -> str:
-    """Subtract b from a.
-
-    Args:
-        a: first int
-        b: second int
-    """
-    return str(a - b)
-
-@tool
-def multiply(a: float, b: float) -> str:
-    """Multiply two numbers.
-
-    Args:
-        a: first int
-        b: second int
-    """
-    return str(a * b)
-
-@tool
-def divide(a: float, b: float) -> str:
-    """Divide a by b.
-
-    Args:
-        a: first int
-        b: second int
-    """
-    if b == 0:
-        return "Cannot divide by zero"
-    return str(a / b)
-
-@tool
-def power(a: float, b: float) -> str:
-    """Raise a to the power of b.
-
-        Args:
-        a: first int
-        b: second int
-    """
-    return str(a ** b)
-
-@tool
-def modulus(a: int, b: int) -> int:
-    """Get the modulus of two numbers.
-
-    Args:
-        a: first int
-        b: second int
-    """
-    return a % b
+    op = (operation or "").strip().lower()
+    if op == "add":
+        return str(a + b)
+    elif op == "subtract":
+        return str(a - b)
+    elif op == "multiply":
+        return str(a * b)
+    elif op == "divide":
+        if b == 0:
+            return "Cannot divide by zero"
+        return str(a / b)
+    elif op == "power":
+        return str(a ** b)
+    elif op == "modulus":
+        return str(int(a) % int(b))
+    else:
+        return f"Unsupported operation '{operation}'. Use: add, subtract, multiply, divide, power, modulus."
 
 @tool
 def string_reverse(input_string: str) -> str:
@@ -313,30 +278,57 @@ def arvix_search(query: str) -> str:
         return f"Error performing arxiv search: {e}. try again."
 
 @tool
-def get_youtube_transcript(page_url: str) -> str:
-    """Get the transcript of a YouTube video
+def youtube_tool(youtube_url: str, question: str = "") -> str:
+    """Get the transcript of a YouTube video, or analyze it with AI to answer a question.
+
+    If question is provided, uses a multimodal AI model to analyze the video (handles visual
+    or audio content beyond just transcript). If question is empty, returns the raw transcript.
 
     Args:
-        page_url (str): YouTube URL of the video
+        youtube_url (str): Full HTTPS URL of the YouTube video.
+        question (str): Optional question to answer about the video. If empty, returns raw transcript.
     """
-    print(f"get_youtube_transcript called: {page_url}")
+    print(f"youtube_tool called: {youtube_url} question={question!r}")
 
+    if not question:
+        # Transcript-only path — no API key needed
+        try:
+            video_id = extract.video_id(youtube_url)
+            ytt_api = YouTubeTranscriptApi()
+            transcript = ytt_api.fetch(video_id)
+            txt = '\n'.join([s.text for s in transcript.snippets])
+            print(f"youtube_transcript: {len(txt)} characters")
+            return txt
+        except Exception as e:
+            msg = f"youtube_tool (transcript) failed: {e}"
+            print(msg)
+            return msg
+
+    # AI analysis path
     try:
-        # get video ID from URL
-        video_id = extract.video_id(page_url)
+        api_key = config.GOOGLE_API_KEY
+        if not api_key:
+            return "Error: GOOGLE_API_KEY environment variable not set"
 
-        # get transcript
-        ytt_api = YouTubeTranscriptApi()
-        transcript = ytt_api.fetch(video_id)
-
-        # keep only text
-        txt = '\n'.join([s.text for s in transcript.snippets])
-        print(f"youtube_transcript: {len(txt)} characters")
-        return txt
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=config.GEMINI_MODEL,
+            contents=[types.Content(
+                parts=[
+                    types.Part(file_data=types.FileData(file_uri=youtube_url)),
+                    types.Part(text=question)
+                ]
+            )],
+            config=types.GenerateContentConfig(
+                temperature=config.GEMINI_TEMPERATURE,
+                max_output_tokens=config.GEMINI_MAX_TOKENS,
+            )
+        )
+        return response.text or "(no response from model)"
     except Exception as e:
-        msg = f"get_youtube_transcript failed: {e}"
-        print(msg)
-        return msg
+        error_msg = f"youtube_tool (AI analysis) failed: {str(e)[:config.QUESTION_PREVIEW_LENGTH]}"
+        print(error_msg)
+        return error_msg
 
 @tool
 def get_webpage_content(page_url: str) -> str:
@@ -374,59 +366,50 @@ def get_webpage_content(page_url: str) -> str:
         return f"get_webpage_content failed: {e}"
 
 @tool
-def read_excel_file(file_name: str) -> str:
-    """
-    Reads an Excel file (.xlsx) and returns its content as a Markdown table.
-    Use this tool to inspect data stored in Excel spreadsheets.
+def read_file(file_name: str, sheet_name: str = "") -> str:
+    """Read a file from the files directory and return its content.
+
+    Supported formats:
+    - .xlsx / .csv  → returned as a Markdown table
+    - .py / .txt / .md / .json / .jsonl → returned as raw text
 
     Args:
-        file_name (str): The name of the file (e.g., 'data.xlsx'). Do not include the 'files/' prefix.
-
-    Returns:
-        str: The file content formatted as a Markdown table.
+        file_name (str): Name of the file (e.g., 'data.xlsx'). Do not include 'files/' prefix.
+        sheet_name (str): For Excel files, the sheet name to read. Leave empty to read the first sheet.
     """
+    print(f"read_file called: {file_name}")
+    ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else ""
 
-    try:
-        print(f"read_excel_file called: with file {file_name}")
-
-        # Get file content using helper function
+    if ext in ("xlsx", "xls"):
         success, data = _get_file_content(file_name, mode='binary')
         if not success:
-            return f"Error: Failed to read Excel file. {data}"
+            return f"Error: {data}"
+        assert isinstance(data, bytes)
+        try:
+            df = pd.read_excel(BytesIO(data), sheet_name=sheet_name or 0)
+            return df.to_markdown(index=False)
+        except Exception as e:
+            return f"Error reading Excel file: {e}"
 
-        # Read Excel from bytes
-        df = pd.read_excel(BytesIO(data))
-        return df.to_markdown(index=False)
+    if ext == "csv":
+        success, data = _get_file_content(file_name, mode='binary')
+        if not success:
+            return f"Error: {data}"
+        assert isinstance(data, bytes)
+        try:
+            df = pd.read_csv(BytesIO(data))
+            return df.to_markdown(index=False)
+        except Exception as e:
+            return f"Error reading CSV file: {e}"
 
-    except Exception as e:
-        return f"Error: Failed to read the Excel file. Reason: {e}"
-
-@tool
-def read_python_script(file_name: str) -> str:
-    """
-    Reads the source code of a Python script.
-    Use this tool to examine the code logic of a .py file.
-    Note: This does NOT execute the script, it only reads the text.
-
-    Args:
-        file_name (str): The name of the file (e.g., 'script.py'). Do not include the 'files/' prefix.
-
-    Returns:
-        str: The raw source code of the script.
-    """
-
-    try:
-        print(f"read_python_script called: with file {file_name}")
-
-        # Get file content using helper function
+    # Text-based formats
+    if ext in ("py", "txt", "md", "json", "jsonl", ""):
         success, data = _get_file_content(file_name, mode='text')
         if not success:
-            return f"Error: Failed to read Python script. {data}"
-
+            return f"Error: {data}"
         return data
 
-    except Exception as e:
-        return f"Error: Failed to read the Python script. Reason: {e}"
+    return f"Unsupported file type '.{ext}'. Supported: xlsx, xls, csv, py, txt, md, json, jsonl."
 
 @tool
 def parse_audio_file(file_name: str) -> str:
@@ -469,47 +452,6 @@ def parse_audio_file(file_name: str) -> str:
         if "ffmpeg" in str(e).lower() or "avlib" in str(e).lower():
             return f"Error: Failed to process audio. Reason: {e}. Ensure ffmpeg is installed and in your system's PATH."
         return f"Error: Failed to parse the audio file. Reason: {e}"
-
-@tool
-def analyze_youtube_video(question: str, youtube_url: str) -> str:
-    """
-    Uses a multimodal AI model to analyze a YouTube video and answer a specific question.
-    Use this tool when you need visual or audio understanding of a YouTube video (e.g., "What is shown in the video?").
-
-    Args:
-        question (str): The question you want answered about the video content.
-        youtube_url (str): The full HTTPS URL of the YouTube video.
-    """
-
-    try:
-        print(f"analyze_youtube_video called: {youtube_url} with question: {question}")
-
-        api_key = config.GOOGLE_API_KEY
-        if not api_key:
-            return "Error: GOOGLE_API_KEY environment variable not set"
-
-        client = genai.Client(api_key=api_key)
-
-        # Add timeout and request options
-        response = client.models.generate_content(
-            model=config.GEMINI_MODEL,
-            contents=[types.Content(
-                    parts=[
-                        types.Part(file_data=types.FileData(file_uri=youtube_url)),
-                        types.Part(text=question)
-                    ]
-                )
-            ],
-            config=types.GenerateContentConfig(
-                temperature=config.GEMINI_TEMPERATURE,
-                max_output_tokens=config.GEMINI_MAX_TOKENS,
-            )
-        )
-        return response.text
-    except Exception as e:
-        error_msg = f"Error analyzing video: {str(e)[:config.QUESTION_PREVIEW_LENGTH]}"
-        print(error_msg)
-        return error_msg
 
 @tool
 def analyze_image(question: str, file_name: str) -> str:
@@ -733,7 +675,7 @@ def http_request(method: str, url: str, headers_json: str = "{}", body_json: str
 def download_file(url: str, file_name: str) -> str:
     """Download a binary file from a URL and save it to the files directory.
 
-    Use this before calling read_excel_file, read_python_script, parse_audio_file,
+    Use this before calling read_file, parse_audio_file,
     or analyze_image on files fetched from an API.
     After downloading, call the appropriate tool with the same file_name.
 
@@ -807,22 +749,15 @@ def get_custom_tools_list() -> list:
         list: List of tool functions
     """
     tools = [
-        add,
-        subtract,
-        multiply,
-        divide,
-        power,
-        modulus,
+        calculate,
         string_reverse,
         websearch,
         wiki_search,
         arvix_search,
-        get_youtube_transcript,
+        youtube_tool,
         get_webpage_content,
-        read_python_script,
-        read_excel_file,
+        read_file,
         parse_audio_file,
-        analyze_youtube_video,
         analyze_image,
         classical_cipher,
         execute_python,
