@@ -1,11 +1,12 @@
-import pytz
-import datetime
+import concurrent.futures
 from ddgs import DDGS
 from bs4 import BeautifulSoup
 import requests
 import re
 import io
 import os
+import subprocess
+import sys
 from google import genai
 from google.genai import types
 import config
@@ -62,6 +63,34 @@ def _get_file_content(file_name: str, mode: str = 'binary'):
 
     Returns:
         tuple: (success: bool, data: bytes/str or error_message: str)
+
+    NOTE — File source for GAIA benchmark question attachments:
+    The question files (.png, .mp3, .py, .xlsx, etc.) are NOT served by the
+    scoring API at agents-course-unit4-scoring.hf.space. A previous version of
+    this code defaulted to that URL, which caused silent 404 failures for any
+    question that referenced a file attachment.
+
+    The correct source is the HuggingFace dataset:
+        repo: gaia-benchmark/GAIA  (type: dataset)
+        path: 2023/validation/<file_name>
+
+    This function now tries sources in order:
+        1. Local files/ directory (cache)
+        2. HuggingFace dataset download (saves to files/ for future runs)
+        3. SPACE_HOST env var (only when deployed on HF Spaces)
+
+    To pre-download all question files manually, run:
+        python -c "
+        import json, os, shutil
+        from huggingface_hub import hf_hub_download
+        questions = json.load(open('files/questions.json', encoding='utf-8'))
+        for q in questions:
+            fn = q.get('file_name', '')
+            if fn and not os.path.exists(f'files/{fn}'):
+                src = hf_hub_download('gaia-benchmark/GAIA', f'2023/validation/{fn}', repo_type='dataset')
+                shutil.copy(src, f'files/{fn}')
+                print('Downloaded', fn)
+        "
     """
     # Sanitize file name first
     is_valid, result = _sanitize_file_path(file_name)
@@ -71,37 +100,57 @@ def _get_file_content(file_name: str, mode: str = 'binary'):
     file_name = result  # Use sanitized name
     file_path = f"files/{file_name}"
 
-    # Try local file first
+    def _read(path: str):
+        if mode == 'binary':
+            with open(path, 'rb') as f:
+                return True, f.read()
+        else:
+            with open(path, 'r', encoding='utf-8') as f:
+                return True, f.read()
+
+    # 1. Local cache
     if os.path.exists(file_path):
         try:
-            if mode == 'binary':
-                with open(file_path, 'rb') as f:
-                    return True, f.read()
-            else:  # text mode
-                with open(file_path, 'r') as f:
-                    return True, f.read()
+            return _read(file_path)
         except Exception as e:
             return False, f"Error reading local file: {e}"
 
-    # If not local, try fetching from remote URL (HF Spaces)
-    else:
-        try:
-            base_url = os.getenv("SPACE_HOST", "agents-course-unit4-scoring.hf.space")
-            if not base_url.startswith("http"):
-                file_url = f"https://{base_url}/files/{file_name}"
-            else:
-                file_url = f"{base_url}/files/{file_name}"
+    # 2. HuggingFace GAIA dataset — downloads and caches locally
+    try:
+        import shutil
+        from huggingface_hub import hf_hub_download
+        print(f"[INFO] Downloading {file_name} from HuggingFace GAIA dataset...")
+        hf_local = hf_hub_download(
+            repo_id='gaia-benchmark/GAIA',
+            filename=f'2023/validation/{file_name}',
+            repo_type='dataset',
+        )
+        os.makedirs('files', exist_ok=True)
+        shutil.copy(hf_local, file_path)
+        print(f"[INFO] Cached to {file_path}")
+        return _read(file_path)
+    except Exception as e:
+        print(f"[WARNING] HuggingFace download failed for {file_name}: {e}")
 
-            print(f"Fetching file from URL: {file_url}")
+    # 3. SPACE_HOST fallback (only when explicitly deployed on a HF Space that serves files)
+    space_host = os.getenv("SPACE_HOST")
+    if space_host:
+        try:
+            if not space_host.startswith("http"):
+                file_url = f"https://{space_host}/files/{file_name}"
+            else:
+                file_url = f"{space_host}/files/{file_name}"
+            print(f"[INFO] Fetching {file_name} from {file_url}")
             response = requests.get(file_url, timeout=30)
             response.raise_for_status()
-
             if mode == 'binary':
                 return True, response.content
-            else:  # text mode
+            else:
                 return True, response.text
         except Exception as e:
-            return False, f"Error fetching remote file: {e}"
+            print(f"[WARNING] SPACE_HOST fetch failed for {file_name}: {e}")
+
+    return False, f"Could not retrieve file '{file_name}' from any source."
 
 def _get_mime_type(file_name: str) -> str:
     """Helper function to determine MIME type from file extension."""
@@ -199,21 +248,6 @@ def string_reverse(input_string: str) -> str:
 
 
 @tool
-def get_current_time_in_timezone(timezone: str) -> str:
-    """A tool that fetches the current local time in a specified timezone.
-    Args:
-        timezone: A string representing a valid timezone (e.g., 'America/New_York').
-    """
-    try:
-        # Create timezone object
-        tz = pytz.timezone(timezone)
-        # Get current time in that timezone
-        local_time = datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-        return f"The current local time in {timezone} is: {local_time}"
-    except Exception as e:
-        return f"Error fetching time for timezone '{timezone}': {str(e)}"
-
-@tool
 def websearch(query: str) -> str:
     """This tool will search the web using DuckDuckGo.
 
@@ -261,7 +295,10 @@ def arvix_search(query: str) -> str:
     try:
         print(f"arvix_search called: {query}")
 
-        search_docs = ArxivLoader(query=query, load_max_docs=3).load()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(lambda: ArxivLoader(query=query, load_max_docs=3).load())
+            search_docs = future.result(timeout=config.ARXIV_TIMEOUT_SECONDS)
+
         formatted_search_docs = "\n\n---\n\n".join(
             [
                 f'<Document source="{doc.metadata["source"]}" page="{doc.metadata.get("page", "")}"/>\n{doc.page_content[:1000]}\n</Document>'
@@ -270,6 +307,8 @@ def arvix_search(query: str) -> str:
 
         print(f"arvix_results: {len(formatted_search_docs)} characters")
         return {"arvix_results": formatted_search_docs}
+    except concurrent.futures.TimeoutError:
+        return f"ArXiv timed out after {config.ARXIV_TIMEOUT_SECONDS}s — try websearch instead"
     except Exception as e:
         return f"Error performing arxiv search: {e}. try again."
 
@@ -524,6 +563,238 @@ def analyze_image(question: str, file_name: str) -> str:
         print(error_msg)
         return error_msg
 
+
+@tool
+def classical_cipher(cipher_type: str, mode: str, text: str, keyword: str = "", period: int = 5) -> str:
+    """Encrypt or decrypt common classical ciphers.
+
+    Supported ciphers: playfair, bifid.
+
+    Args:
+        cipher_type (str): Cipher family: 'playfair' or 'bifid'.
+        mode (str): 'encrypt' or 'decrypt'.
+        text (str): Input text (letters only; j is mapped to i).
+        keyword (str): Key phrase used to build the 5x5 square.
+        period (int): Bifid period (ignored for Playfair). Default is 5.
+    """
+    ctype = (cipher_type or "").strip().lower()
+    op = (mode or "").strip().lower()
+    if ctype not in {"playfair", "bifid"}:
+        return "Unsupported cipher_type. Use 'playfair' or 'bifid'."
+    if op not in {"encrypt", "decrypt"}:
+        return "Unsupported mode. Use 'encrypt' or 'decrypt'."
+    if period <= 0:
+        return "Invalid period. Use a positive integer."
+
+    alphabet = "abcdefghiklmnopqrstuvwxyz"
+
+    def _normalize(s: str) -> str:
+        return re.sub(r"[^a-z]", "", (s or "").lower().replace("j", "i"))
+
+    def _build_square(key: str):
+        seen = []
+        for c in _normalize(key) + alphabet:
+            if c not in seen:
+                seen.append(c)
+        sq = [seen[i * 5:(i + 1) * 5] for i in range(5)]
+        pos = {c: (r, cidx) for r, row in enumerate(sq) for cidx, c in enumerate(row)}
+        inv = {(r, cidx): ch for r, row in enumerate(sq) for cidx, ch in enumerate(row)}
+        return sq, pos, inv
+
+    sq, pos, inv = _build_square(keyword)
+    normalized = _normalize(text)
+    if not normalized:
+        return ""
+
+    if ctype == "playfair":
+        if len(normalized) % 2 != 0:
+            normalized = normalized + "x"
+        d = -1 if op == "decrypt" else 1
+        out = []
+        for i in range(0, len(normalized), 2):
+            a, b = normalized[i], normalized[i + 1]
+            ra, ca = pos[a]
+            rb, cb = pos[b]
+            if ra == rb:
+                out.append(sq[ra][(ca + d) % 5])
+                out.append(sq[rb][(cb + d) % 5])
+            elif ca == cb:
+                out.append(sq[(ra + d) % 5][ca])
+                out.append(sq[(rb + d) % 5][cb])
+            else:
+                out.append(sq[ra][cb])
+                out.append(sq[rb][ca])
+        return "".join(out)
+
+    # bifid
+    if op == "encrypt":
+        out = []
+        for i in range(0, len(normalized), period):
+            block = normalized[i:i + period]
+            rows, cols = [], []
+            for ch in block:
+                r, c = pos[ch]
+                rows.append(r + 1)
+                cols.append(c + 1)
+            nums = rows + cols
+            for j in range(0, len(nums), 2):
+                out.append(inv[(nums[j] - 1, nums[j + 1] - 1)])
+        return "".join(out)
+
+    out = []
+    for i in range(0, len(normalized), period):
+        block = normalized[i:i + period]
+        nums = []
+        for ch in block:
+            r, c = pos[ch]
+            nums.extend([r + 1, c + 1])
+        half = len(block)
+        rows, cols = nums[:half], nums[half:]
+        for rr, cc in zip(rows, cols):
+            out.append(inv[(rr - 1, cc - 1)])
+    return "".join(out)
+
+
+@tool
+def execute_python(code: str) -> str:
+    """Execute a Python code snippet and return its stdout output.
+
+    Use this for precise computations the LLM cannot do reliably:
+    counting characters, implementing algorithms (ciphers, prime sieves),
+    math calculations, data transformations, etc.
+
+    Args:
+        code (str): Valid Python 3 code. Use print() to produce output.
+                    Do not read/write files or make network calls from within the code.
+    """
+    timeout = 30
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip() or "(no output)"
+        return f"Exit {result.returncode}:\n{result.stderr.strip()}"
+    except subprocess.TimeoutExpired:
+        return f"Execution timed out after {timeout}s"
+    except Exception as e:
+        return f"execute_python failed: {e}"
+
+
+@tool
+def http_request(method: str, url: str, headers_json: str = "{}", body_json: str = "{}") -> str:
+    """Make an HTTP request with a custom method, headers, and JSON body.
+
+    Use this for POST, DELETE, or authenticated GET requests that require
+    custom headers (e.g. Authorization: Bearer ...) or a request body.
+
+    Args:
+        method (str): HTTP method — 'GET', 'POST', or 'DELETE'.
+        url (str): The full URL to call.
+        headers_json (str): JSON object of request headers, e.g. '{"Authorization": "Bearer TOKEN"}'.
+        body_json (str): JSON object for the request body (POST only). Use '{}' for empty body.
+
+    Returns:
+        str: Response body as text, prefixed with the HTTP status code.
+    """
+    import json
+    method = method.upper()
+    try:
+        headers = json.loads(headers_json)
+    except Exception as e:
+        return f"Invalid headers_json: {e}"
+    try:
+        body = json.loads(body_json)
+    except Exception as e:
+        return f"Invalid body_json: {e}"
+
+    try:
+        if method == "GET":
+            r = requests.get(url, headers=headers, timeout=30)
+        elif method == "POST":
+            r = requests.post(url, headers=headers, json=body, timeout=30)
+        elif method == "DELETE":
+            r = requests.delete(url, headers=headers, timeout=30)
+        else:
+            return f"Unsupported method '{method}'. Use GET, POST, or DELETE."
+        try:
+            content = json.dumps(r.json(), ensure_ascii=False)
+        except ValueError:
+            content = r.text
+        return f"HTTP {r.status_code}\n{content}"
+    except Exception as e:
+        return f"http_request failed ({method} {url}): {e}"
+
+
+@tool
+def download_file(url: str, file_name: str) -> str:
+    """Download a binary file from a URL and save it to the files directory.
+
+    Use this before calling read_excel_file, read_python_script, parse_audio_file,
+    or analyze_image on files fetched from an API.
+    After downloading, call the appropriate tool with the same file_name.
+
+    Args:
+        url (str): The full URL of the file to download.
+        file_name (str): Local file name to save as (e.g. 'data.xlsx', 'audio.mp3').
+                         Must not contain path separators or '..'.
+    """
+    if "/" in file_name or "\\" in file_name or ".." in file_name:
+        return "Invalid file_name: path separators and '..' are not allowed."
+
+    try:
+        r = requests.get(url, timeout=60)
+        r.raise_for_status()
+    except Exception as e:
+        return f"download_file failed (fetch): {e}"
+
+    os.makedirs(config.FILES_DIR, exist_ok=True)
+    dest = os.path.join(config.FILES_DIR, file_name)
+    try:
+        with open(dest, "wb") as f:
+            f.write(r.content)
+        return f"Downloaded {len(r.content)} bytes → {dest}"
+    except Exception as e:
+        return f"download_file failed (write): {e}"
+
+
+@tool
+def ask_advisor(question: str) -> str:
+    """Consult a more powerful AI model when you are stuck or uncertain after 2+ failed attempts.
+
+    Describe what you are trying to solve and what you have already tried.
+    The advisor returns a concise recommendation (2-3 sentences) to guide your next step.
+    Use sparingly — only for genuinely hard reasoning or planning problems, not for tool failures.
+
+    Args:
+        question (str): A clear description of the problem and what approaches you have already tried.
+    """
+    try:
+        api_key = config.GOOGLE_API_KEY
+        if not api_key:
+            return "Error: GOOGLE_API_KEY not configured"
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=config.GEMINI_MODEL,
+            contents=question,
+            config=types.GenerateContentConfig(
+                system_instruction=(
+                    "You are an expert advisor for an AI agent. "
+                    "The agent is stuck on a sub-problem and needs guidance. "
+                    "Give a concise, actionable recommendation in 2-3 sentences. "
+                    "Do not solve the full problem — guide the next step only."
+                ),
+                temperature=0,
+            )
+        )
+        return response.text or "Advisor returned no response."
+    except Exception as e:
+        return f"Advisor unavailable: {e}"
+
+
 # ============================================================================
 # Tools List
 # ============================================================================
@@ -543,7 +814,6 @@ def get_custom_tools_list() -> list:
         power,
         modulus,
         string_reverse,
-        get_current_time_in_timezone,
         websearch,
         wiki_search,
         arvix_search,
@@ -553,6 +823,11 @@ def get_custom_tools_list() -> list:
         read_excel_file,
         parse_audio_file,
         analyze_youtube_video,
-        analyze_image
+        analyze_image,
+        classical_cipher,
+        execute_python,
+        ask_advisor,
+        http_request,
+        download_file,
     ]
     return tools
