@@ -26,4 +26,4 @@ markdownify
 numpy
 pandas
 colorama
-langfuse
+gradio[oauth]

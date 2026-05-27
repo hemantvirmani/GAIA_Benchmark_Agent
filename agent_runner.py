@@ -4,8 +4,6 @@ from typing import Optional, Tuple, List, Dict
 from colorama import Fore, Style
 from agents import MyGAIAAgents
 import config
-from langfuse_tracking import track_question_processing
-
 
 class AgentRunner:
     """Handles agent execution and question processing.
@@ -52,11 +50,7 @@ class AgentRunner:
             print(f"{'#' * config.SEPARATOR_WIDTH}")
 
             try:
-                # Track individual question processing with Langfuse
-                with track_question_processing(task_id, question_text) as span:
-                    answer = self.agent(question_text, file_name=file_name)
-                    if span:
-                        span.update(output={"answer": str(answer)[:300]})
+                answer = self.agent(question_text, file_name=file_name)
 
                 print(f"\n{Fore.GREEN}[RESULT] Task ID: {task_id}{Style.RESET_ALL}")
                 print(f"Question: {question_text[:config.QUESTION_PREVIEW_LENGTH]}{'...' if len(question_text) > config.QUESTION_PREVIEW_LENGTH else ''}")

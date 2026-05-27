@@ -30,7 +30,6 @@ from custom_tools import get_custom_tools_list
 from system_prompt import SYSTEM_PROMPT
 from utils import cleanup_answer, extract_text_from_content
 import config
-from langfuse_tracking import track_agent_execution
 
 # Suppress BeautifulSoup GuessedAtParserWarning
 try:
@@ -106,7 +105,6 @@ class LlamaIndexAgent:
 
         return agent
 
-    @track_agent_execution("LlamaIndex")
     def __call__(self, question: str, file_name: str = None) -> str:
         """
         Invoke the LlamaIndex agent with the given question and return the final answer.

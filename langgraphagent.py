@@ -23,7 +23,6 @@ from custom_tools import get_custom_tools_list
 from system_prompt import SYSTEM_PROMPT
 from utils import cleanup_answer, extract_text_from_content
 import config
-from langfuse_tracking import track_agent_execution, track_llm_call
 
 # Suppress BeautifulSoup GuessedAtParserWarning
 try:
@@ -62,6 +61,7 @@ class LangGraphAgent:
                 model=config.ACTIVE_AGENT_LLM_MODEL,
                 temperature=0,
                 api_key=apikey,
+                thinking_budget=0,
                 timeout=60  # Add timeout to prevent hanging
                 ).bind_tools(self.tools)
 
@@ -97,7 +97,6 @@ class LangGraphAgent:
             "step_count": 0  # Initialize step counter
                 }
 
-    @track_llm_call(config.ACTIVE_AGENT_LLM_MODEL)
     def _assistant(self, state: AgentState):
         """Assistant node which calls the LLM with tools"""
 
@@ -227,7 +226,6 @@ class LangGraphAgent:
         # Compile graph
         return graph.compile()
 
-    @track_agent_execution("LangGraph")
     def __call__(self, question: str, file_name: str = None) -> str:
         """Invoke the agent graph with the given question and return the final answer.
 
