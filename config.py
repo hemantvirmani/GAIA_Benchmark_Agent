@@ -35,7 +35,7 @@ AGENT_REACT_LANGGRAPH = "ReActLangGraph"
 AGENT_LLAMAINDEX = "LLamaIndex"
 AGENT_SMOL = "SMOL"
 
-ACTIVE_AGENT = AGENT_REACT_LANGGRAPH  # Active agent to use by default
+ACTIVE_AGENT = AGENT_LANGGRAPH  # Active agent to use by default
 
 # Model Configuration
 GEMINI_MODEL = "gemini-2.5-flash"

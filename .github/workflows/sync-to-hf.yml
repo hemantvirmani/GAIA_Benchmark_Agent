@@ -27,5 +27,10 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           git remote add hf https://hemantvirmani:$HF_SYNC_TOKEN@huggingface.co/spaces/hemantvirmani/Final_Assignment_Template
-          git push hf main --force
+          # Push only the current file state as a single orphan commit.
+          # This prevents HF from seeing old commits that contained binary files.
+          git checkout --orphan hf-deploy
+          git add -A
+          git commit -m "Deploy to HuggingFace Space"
+          git push hf hf-deploy:main --force
           
