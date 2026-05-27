@@ -1,2 +1,8 @@
 __pycache__/*.pyc
 .venv/
+
+# GAIA question attachment files — downloaded at runtime from HuggingFace dataset
+# Keep only questions.json and metadata.jsonl; ignore everything else in files/
+files/*
+!files/questions.json
+!files/metadata.jsonl
