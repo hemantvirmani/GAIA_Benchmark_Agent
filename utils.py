@@ -130,8 +130,10 @@ def cleanup_answer(answer: Any) -> str:
 
     This function:
     - Converts answer to string
+    - Handles multi-line answers (extracts last meaningful non-debug line)
     - Removes comma separators from numbers (e.g., "1,000" -> "1000")
-    - Strips whitespace and trailing punctuation
+    - Normalizes whitespace
+    - Strips trailing punctuation
     - Logs warnings for verbose or malformatted answers
 
     Args:
@@ -140,23 +142,37 @@ def cleanup_answer(answer: Any) -> str:
     Returns:
         str: Cleaned up answer as plain text
     """
-    # Convert to string and strip whitespace
     answer = str(answer).strip()
+
+    if not answer:
+        return answer
+
+    # Handle multi-line: take the last line that isn't a debug/log prefix
+    lines = [l.strip() for l in answer.split('\n') if l.strip()]
+    if len(lines) > 1:
+        debug_prefixes = ('[info', '[warning', '[error', '[retry', '[step', '[tool', '[final')
+        for l in reversed(lines):
+            if not l.lower().startswith(debug_prefixes):
+                answer = l
+                break
+        else:
+            answer = lines[-1]
+        print(f"[CLEANUP] Extracted last meaningful line from {len(lines)}-line answer: '{answer[:80]}'")
 
     # Remove comma separators from numbers (e.g., "1,000" -> "1000")
     if ',' in answer and answer.replace(',', '').replace('.', '').isdigit():
         answer = answer.replace(',', '')
-        print(f"[VALIDATION] Removed comma separators from answer")
+        print(f"[CLEANUP] Removed comma separators from answer")
 
-    # Ensure no trailing/leading whitespace or punctuation
-    answer = answer.strip().rstrip('.')
+    # Normalize whitespace and strip trailing punctuation
+    answer = ' '.join(answer.split()).strip().rstrip('.')
 
     # Log if answer looks verbose (agent not following instructions)
     if len(answer) > 100:
         print(f"[WARNING] Answer appears verbose ({len(answer)} chars). Agent may not be following SYSTEM_PROMPT instructions.")
         print(f"[WARNING] First 150 chars: {answer[:150]}...")
 
-    # Log if answer looks suspicious (for debugging)
+    # Log if answer contains suspicious formatting characters
     if any(char in answer for char in ['{', '}', '[', ']', '`', '*', '#']):
         print(f"[WARNING] Answer contains suspicious formatting characters: {answer[:100]}")
 
