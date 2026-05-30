@@ -38,11 +38,21 @@ AGENT_SMOL = "SMOL"
 ACTIVE_AGENT = AGENT_LANGGRAPH  # Active agent to use by default
 
 # Model Configuration
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.5-flash"
 GEMINI_TEMPERATURE = 0
 GEMINI_MAX_TOKENS = 1024
 
 ACTIVE_AGENT_LLM_MODEL = GEMINI_MODEL
+
+# Agent Step Limits
+# AGENT_STEP_LIMIT is the single source of truth — the max number of assistant
+# iterations (LLM + tool call) per question before the graph is force-terminated.
+# The agent forces a final bare-answer call one step BEFORE this limit.
+# AGENT_RECURSION_LIMIT is DERIVED so the invariant always holds: LangGraph's
+# recursion_limit must exceed 2x the step limit (each step ~= 2 graph nodes:
+# assistant + tools), plus a safety buffer.
+AGENT_STEP_LIMIT = 60
+AGENT_RECURSION_LIMIT = AGENT_STEP_LIMIT * 2 + 20
 
 # ArXiv timeout
 ARXIV_TIMEOUT_SECONDS = 30

@@ -167,14 +167,13 @@ def cleanup_answer(answer: Any) -> str:
     # Normalize whitespace and strip trailing punctuation
     answer = ' '.join(answer.split()).strip().rstrip('.')
 
-    # Pattern 2 (applied at any length): sentence.NUMBER suffix — the agent echoed its
-    # final answer as a bare number appended after a period following a letter.
-    # Requires a letter before the period to avoid matching decimal numbers like "89706.00".
-    # e.g. "Therefore, she published 4 studio albums.4" → "4" (letter 's' before period)
-    # e.g. "89706.00" → NOT matched (digit '6' before period, so no extraction)
-    if re.search(r'[a-zA-Z]\.\d+$', answer):
-        num_match = re.search(r'\.(\d+)$', answer)
-        extracted = num_match.group(1)
+    # Sentence.NUMBER suffix — the model echoed its final answer as a bare number
+    # appended directly after its reasoning, e.g. "...published 3 albums (included).3".
+    # Match a NON-DIGIT char before the period (covers letters, ')', etc.) and require
+    # whitespace earlier in the string so genuine bare decimals like "89706.00" or
+    # "3.14" (no spaces) are never altered.
+    if ' ' in answer and re.search(r'[^\d\s]\s*\.\d+$', answer):
+        extracted = re.search(r'\.(\d+)$', answer).group(1)
         print(f"[CLEANUP] Extracted appended number from verbose answer: '{extracted}'")
         answer = extracted
 

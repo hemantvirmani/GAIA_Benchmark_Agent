@@ -109,7 +109,7 @@ class LangGraphAgent:
 
         # Force termination at step limit — _should_continue cannot persist state changes
         # so we detect the near-limit here and force a final LLM call without tool binding
-        if current_step >= 44:
+        if current_step >= config.AGENT_STEP_LIMIT - 1:  # force a final bare-answer call one step before the hard limit
             existing = state.get("answer")
             if existing:
                 return {"messages": [], "answer": existing, "step_count": current_step}
@@ -270,8 +270,8 @@ class LangGraphAgent:
         step_count = state.get("step_count", 0)
 
         # Stop if we've exceeded maximum steps
-        if step_count >= 45:  # Conservative: triggers before recursion_limit=120 (45*2=90 < 120)
-            print(f"[WARNING] Max steps (45) reached, forcing termination")
+        if step_count >= config.AGENT_STEP_LIMIT:  # Backstop; recursion_limit is derived to exceed 2x this
+            print(f"[WARNING] Max steps ({config.AGENT_STEP_LIMIT}) reached, forcing termination")
             # Force a final answer if we don't have one
             if not state.get("answer"):
                 state["answer"] = "Error: Maximum iteration limit reached"
@@ -320,7 +320,7 @@ class LangGraphAgent:
         try:
             response = self.graph.invoke(
                 {"question": question, "messages": [], "answer": None, "step_count": 0, "file_name": file_name or ""},
-                config={"recursion_limit": 120}  # Must be > 2x step limit (45 * 2 = 90 < 120)
+                config={"recursion_limit": config.AGENT_RECURSION_LIMIT}  # Derived in config: > 2x step limit
             )
 
             elapsed_time = time.time() - start_time
