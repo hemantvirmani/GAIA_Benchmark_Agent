@@ -25,6 +25,19 @@ from io import BytesIO
 from markdownify import markdownify as md
 
 # ============================================================================
+# Shared HTTP headers
+# ============================================================================
+# Many sites (notably Wikipedia) return 403 to the default python-requests
+# User-Agent. Send a browser-like UA for all outbound page/file fetches.
+_HTTP_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36 GAIA-Agent/1.0"
+    )
+}
+
+# ============================================================================
 # Per-question tool call counters (reset at start of each question)
 # ============================================================================
 _analyze_image_call_count = 0
@@ -356,7 +369,7 @@ def get_webpage_content(page_url: str) -> str:
 
     try:
         print(f"get_web_page_content called: with url {page_url}")
-        r = requests.get(page_url, timeout=30)  # Add 30s timeout
+        r = requests.get(page_url, timeout=30, headers=_HTTP_HEADERS)  # Add 30s timeout
         r.raise_for_status()
         text = ""
         # special case if page is a PDF file
@@ -710,7 +723,7 @@ def download_file(url: str, file_name: str) -> str:
         return "Invalid file_name: path separators and '..' are not allowed."
 
     try:
-        r = requests.get(url, timeout=60)
+        r = requests.get(url, timeout=60, headers=_HTTP_HEADERS)
         r.raise_for_status()
     except Exception as e:
         return f"download_file failed (fetch): {e}"
