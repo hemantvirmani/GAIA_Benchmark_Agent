@@ -103,7 +103,7 @@ class ReActLangGraphAgent:
                     # LangGraph's create_react_agent expects messages as input
                     response = self.agent_graph.invoke(
                         {"messages": [HumanMessage(content=question_content)]},
-                        config={"recursion_limit": 80}  # Match the recursion limit from LangGraphAgent
+                        config={"recursion_limit": 100}  # Match the recursion limit from LangGraphAgent
                     )
                     # Success - break out of retry loop
                     break

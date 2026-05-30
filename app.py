@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import requests
 import pandas as pd
@@ -6,6 +7,7 @@ import json
 import time
 import warnings
 import logging
+import datetime
 from enum import Enum
 from colorama import init
 
@@ -297,6 +299,32 @@ def run_test_code(filter=None, active_agent=None) -> pd.DataFrame:
     return pd.DataFrame(logs_for_display)
 
 
+class _TeeOutput:
+    """Writes to both stdout and a log file simultaneously."""
+    def __init__(self, logfile):
+        self._logfile = logfile
+        self._stdout = sys.stdout
+    def write(self, text):
+        try:
+            self._stdout.write(text)
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            # Windows console (cp1252) can't encode all Unicode chars.
+            # Write a safe version to the console, full version to the log file.
+            enc = getattr(self._stdout, 'encoding', None) or 'utf-8'
+            safe = text.encode(enc, errors='replace').decode(enc, errors='replace')
+            try:
+                self._stdout.write(safe)
+            except Exception:
+                pass
+        self._logfile.write(text)
+    def flush(self):
+        self._stdout.flush()
+        self._logfile.flush()
+    # Pass through attribute access for colorama / other stdout consumers
+    def __getattr__(self, name):
+        return getattr(self._stdout, name)
+
+
 def main() -> None:
     """Main entry point for the application."""
     parser = argparse.ArgumentParser(description="Run the agent application.")
@@ -369,14 +397,23 @@ def main() -> None:
         else:  # args.testall
             test_filter = None  # Test all questions
 
-        print(f"Running test code on {len(test_filter) if test_filter else 'ALL'} questions (CLI mode)...")
-        result = run_test_code(filter=test_filter, active_agent=active_agent)
+        log_path = f"test_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        print(f"[LOG] Writing full output to {log_path}")
+        with open(log_path, 'w', encoding='utf-8') as logfile:
+            original_stdout = sys.stdout
+            sys.stdout = _TeeOutput(logfile)
+            try:
+                print(f"Running test code on {len(test_filter) if test_filter else 'ALL'} questions (CLI mode)...")
+                result = run_test_code(filter=test_filter, active_agent=active_agent)
 
-        # Print results
-        if isinstance(result, pd.DataFrame):
-            ResultFormatter.print_dataframe(result)
-        else:
-            print(result)
+                # Print results
+                if isinstance(result, pd.DataFrame):
+                    ResultFormatter.print_dataframe(result)
+                else:
+                    print(result)
+            finally:
+                sys.stdout = original_stdout
+        print(f"[LOG] Full output saved to {log_path}")
 
 
 if __name__ == "__main__":

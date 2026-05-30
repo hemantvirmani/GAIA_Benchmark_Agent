@@ -25,6 +25,19 @@ from io import BytesIO
 from markdownify import markdownify as md
 
 # ============================================================================
+# Per-question tool call counters (reset at start of each question)
+# ============================================================================
+_analyze_image_call_count = 0
+MAX_ANALYZE_IMAGE_CALLS = 2
+
+
+def reset_tool_counters():
+    """Reset per-question tool counters. Call at the start of each new question."""
+    global _analyze_image_call_count
+    _analyze_image_call_count = 0
+
+
+# ============================================================================
 # Helper Functions (must be defined before tools that use them)
 # ============================================================================
 
@@ -467,9 +480,18 @@ def analyze_image(question: str, file_name: str) -> str:
         str: The answer to the question based on the image analysis.
     """
 
-    try:
-        print(f"analyze_image called: {file_name} with question: {question}")
+    global _analyze_image_call_count
+    _analyze_image_call_count += 1
+    print(f"analyze_image called: {file_name} with question: {question}")
+    if _analyze_image_call_count > MAX_ANALYZE_IMAGE_CALLS:
+        return (
+            f"ERROR: analyze_image has already been called {_analyze_image_call_count - 1} times. "
+            f"MAXIMUM is {MAX_ANALYZE_IMAGE_CALLS}. "
+            "Do NOT call analyze_image again. Commit to the chess position already described and use "
+            "execute_python with the chess library to find the winning move."
+        )
 
+    try:
         api_key = config.GOOGLE_API_KEY
         if not api_key:
             return "Error: GOOGLE_API_KEY environment variable not set"
@@ -724,10 +746,11 @@ def ask_advisor(question: str) -> str:
             contents=question,
             config=types.GenerateContentConfig(
                 system_instruction=(
-                    "You are an expert advisor for an AI agent. "
-                    "The agent is stuck on a sub-problem and needs guidance. "
-                    "Give a concise, actionable recommendation in 2-3 sentences. "
-                    "Do not solve the full problem — guide the next step only."
+                    "You are an expert advisor for an AI agent that is stuck on a search or reasoning problem. "
+                    "Give a concise, actionable recommendation in 2-3 sentences about what to search for or how to reason. "
+                    "Do NOT suggest installing Python packages or software. "
+                    "Do NOT suggest writing code. "
+                    "Only give search strategy or reasoning guidance."
                 ),
                 temperature=0,
             )

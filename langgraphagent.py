@@ -19,7 +19,7 @@ from langgraph.prebuilt import ToolNode
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
-from custom_tools import get_custom_tools_list
+from custom_tools import get_custom_tools_list, reset_tool_counters
 from system_prompt import SYSTEM_PROMPT
 from utils import cleanup_answer, extract_text_from_content
 import config
@@ -84,6 +84,9 @@ class LangGraphAgent:
     def _init_questions(self, state: AgentState):
         """Initialize the messages in the state with system prompt and user question."""
 
+        # Reset per-question tool counters (e.g., analyze_image call limit)
+        reset_tool_counters()
+
         # Build the question message, including file name if available
         question_content = state["question"]
         if state.get("file_name"):
@@ -103,6 +106,58 @@ class LangGraphAgent:
         # Track and log current step
         current_step = state.get("step_count", 0) + 1
         print(f"[STEP {current_step}] Calling assistant with {len(state['messages'])} messages")
+
+        # Force termination at step limit — _should_continue cannot persist state changes
+        # so we detect the near-limit here and force a final LLM call without tool binding
+        if current_step >= 44:
+            existing = state.get("answer")
+            if existing:
+                return {"messages": [], "answer": existing, "step_count": current_step}
+            print(f"[WARNING] Near step limit at step {current_step} with no answer — forcing bare LLM call")
+            from langchain_core.messages import SystemMessage as SM
+            forced_suffix = SM(content="STOP ALL TOOL CALLS. Based only on information gathered so far, output ONLY the bare answer value — one word, number, or short phrase. No explanation.")
+
+            def _extract_content(resp_content):
+                if not resp_content:
+                    return ""
+                if isinstance(resp_content, str):
+                    return resp_content.strip()
+                if isinstance(resp_content, list):
+                    parts = [item['text'] if isinstance(item, dict) and 'text' in item else str(item) for item in resp_content]
+                    return " ".join(parts).strip()
+                return str(resp_content).strip()
+
+            llm_client = self.llm_client_with_tools
+            if llm_client is None:
+                return {"messages": [], "answer": "Error: Step limit reached", "step_count": current_step}
+
+            # Attempt 1: full context
+            try:
+                forced_messages = list(state["messages"]) + [forced_suffix]
+                forced_resp = llm_client.invoke(forced_messages)
+                content = _extract_content(forced_resp.content)
+                if content:
+                    print(f"[FORCED FINAL] {content[:100]}")
+                    return {"messages": [], "answer": content, "step_count": current_step}
+                print("[FORCED FINAL] Empty content on attempt 1, retrying with reduced context")
+            except Exception as fe:
+                print(f"[WARNING] Forced final call attempt 1 failed: {fe}")
+
+            # Attempt 2: reduced context (first 2 messages + last 10 messages) to avoid token overload
+            try:
+                msgs = state["messages"]
+                reduced = msgs[:2] + (msgs[-10:] if len(msgs) > 12 else msgs[2:])
+                reduced_messages = reduced + [forced_suffix]
+                forced_resp2 = llm_client.invoke(reduced_messages)
+                content2 = _extract_content(forced_resp2.content)
+                if content2:
+                    print(f"[FORCED FINAL REDUCED] {content2[:100]}")
+                    return {"messages": [], "answer": content2, "step_count": current_step}
+                print("[FORCED FINAL] Empty content on attempt 2 as well")
+            except Exception as fe2:
+                print(f"[WARNING] Forced final call attempt 2 failed: {fe2}")
+
+            return {"messages": [], "answer": "Error: Step limit reached", "step_count": current_step}
 
         # Invoke LLM with tools enabled, with retry logic for 504 errors
         max_retries = config.MAX_RETRIES
@@ -172,6 +227,22 @@ class LangGraphAgent:
             content = content.strip()
             print(f"[EXTRACTED TEXT] {content[:100]}{'...' if len(content) > 100 else ''}")
 
+            # If content is empty (transient Gemini API issue), retry once with same messages
+            if not content:
+                print(f"[WARNING] Empty response from LLM at step {current_step} — retrying once")
+                try:
+                    retry_resp = self.llm_client_with_tools.invoke(state["messages"])  # type: ignore[union-attr]
+                    retry_content = retry_resp.content
+                    if isinstance(retry_content, str):
+                        content = retry_content.strip()
+                    elif isinstance(retry_content, list):
+                        parts = [item['text'] if isinstance(item, dict) and 'text' in item else str(item) for item in retry_content]
+                        content = " ".join(parts).strip()
+                    if content:
+                        print(f"[RETRY SUCCESS] Got content on retry: {content[:80]}")
+                except Exception as re_err:
+                    print(f"[WARNING] Retry also failed: {re_err}")
+
             return {
                 "messages": [response],
                 "answer": content,
@@ -195,8 +266,8 @@ class LangGraphAgent:
         step_count = state.get("step_count", 0)
 
         # Stop if we've exceeded maximum steps
-        if step_count >= 40:  # Increased from 25 to handle complex multi-step reasoning
-            print(f"[WARNING] Max steps (40) reached, forcing termination")
+        if step_count >= 45:  # Conservative: triggers before recursion_limit=120 (45*2=90 < 120)
+            print(f"[WARNING] Max steps (45) reached, forcing termination")
             # Force a final answer if we don't have one
             if not state.get("answer"):
                 state["answer"] = "Error: Maximum iteration limit reached"
@@ -245,7 +316,7 @@ class LangGraphAgent:
         try:
             response = self.graph.invoke(
                 {"question": question, "messages": [], "answer": None, "step_count": 0, "file_name": file_name or ""},
-                config={"recursion_limit": 80}  # Must be >= 2x step limit (40 * 2 = 80)
+                config={"recursion_limit": 120}  # Must be > 2x step limit (45 * 2 = 90 < 120)
             )
 
             elapsed_time = time.time() - start_time
