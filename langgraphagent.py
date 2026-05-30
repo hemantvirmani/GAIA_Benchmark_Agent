@@ -227,10 +227,14 @@ class LangGraphAgent:
             content = content.strip()
             print(f"[EXTRACTED TEXT] {content[:100]}{'...' if len(content) > 100 else ''}")
 
-            # If content is empty (transient Gemini API issue), retry once with same messages
-            if not content:
-                print(f"[WARNING] Empty response from LLM at step {current_step} — retrying once")
+            # If content is empty (transient Gemini API issue), retry up to 3 times
+            retry_num = 0
+            while not content and retry_num < 3:
+                retry_num += 1
+                print(f"[WARNING] Empty response from LLM at step {current_step} — retry {retry_num}/3")
                 try:
+                    import time as _time
+                    _time.sleep(retry_num * 2)  # back off: 2s, 4s, 6s
                     retry_resp = self.llm_client_with_tools.invoke(state["messages"])  # type: ignore[union-attr]
                     retry_content = retry_resp.content
                     if isinstance(retry_content, str):
@@ -239,9 +243,9 @@ class LangGraphAgent:
                         parts = [item['text'] if isinstance(item, dict) and 'text' in item else str(item) for item in retry_content]
                         content = " ".join(parts).strip()
                     if content:
-                        print(f"[RETRY SUCCESS] Got content on retry: {content[:80]}")
+                        print(f"[RETRY SUCCESS] Got content on retry {retry_num}: {content[:80]}")
                 except Exception as re_err:
-                    print(f"[WARNING] Retry also failed: {re_err}")
+                    print(f"[WARNING] Retry {retry_num} failed: {re_err}")
 
             return {
                 "messages": [response],

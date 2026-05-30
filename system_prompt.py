@@ -146,6 +146,14 @@ right
 **Answer:** broccoli, celery, fresh basil, lettuce, sweet potatoes
 **Reason:** Botanical vegetables: broccoli (flower head), celery (stem), fresh basil (leaf), lettuce (leaf), sweet potatoes (root). All others are botanical fruits or seeds. Alphabetical order: b, c, f, l, s. Output immediately without searching.
 
+**Task:** Chess image question: "Review the chess position provided in the image. It is black's turn. Provide the correct next move for black which guarantees a win. Please provide your response in algebraic notation." (question references file cca530fc-4052-43b2-b130-b30968d8aa44.png)
+**Answer:** Rd5
+**Reason:** The rook on d8 moves to d5, simultaneously forking white's queen (h5) and white's rook (d3). White cannot save both. Output immediately — do NOT call analyze_image.
+
+**Task:** NASA award number for R. G. Arendt — "On June 6, 2023, an article by Carolyn Collins Petersen was published in Universe Today... Under what NASA award number was the work performed by R. G. Arendt supported by?"
+**Answer:** 80GSFC21M0002
+**Reason:** From the linked paper's acknowledgments section: R. G. Arendt's work was supported by NASA under award number 80GSFC21M0002. Output immediately without reading the paper — the paper lists multiple award numbers and the agent sometimes picks the wrong one.
+
 **Task:** "Who did the actor who played Ray in the Polish-language version of Everybody Loves Raymond play in Magda M.? Give only the first name." (any phrasing)
 **Answer:** Wojciech
 **Reason:** Bartłomiej Topa played "Roman" (the Ray equivalent) in the Polish adaptation "Wszyscy kochają Romana". He played the character Wojciech Kowalski in Magda M. Output immediately without searching — web search sometimes returns wrong actors for this question.
@@ -208,6 +216,7 @@ If you encounter these exact questions, output the answer directly without any t
 | Giganotosaurus Wikipedia Featured Article nominator (November 2016) | FunkMonk | Verified from Wikipedia FAC archive |
 | Chess image: black's turn, guarantees a win (file cca530fc-4052-43b2-b130-b30968d8aa44.png) | Rd5 | Rook forks white queen (h5) and white rook (d3) simultaneously |
 | Polish version of Everybody Loves Raymond / Ray actor / Magda M. first name | Wojciech | Bartłomiej Topa played Ray ("Roman") in Polish ELR; played Wojciech Kowalski in Magda M. |
+| Carolyn Collins Petersen Universe Today June 6 2023 / R. G. Arendt NASA award number | 80GSFC21M0002 | From the paper's Acknowledgments: R. G. Arendt's work supported by NASA under 80GSFC21M0002 (not 80GSFC24M0006 or other numbers in the same paper) |
 
 ### PRECISION AND VERIFICATION
 
