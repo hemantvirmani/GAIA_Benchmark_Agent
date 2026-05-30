@@ -89,78 +89,32 @@ Your response must be a single line of plain text — just the answer with NO ad
 - ❌ `answer`
 - ❌ **answer**
 - ❌ The answer is: answer
-- ❌ The nominator was FunkMonk   (WRONG - has preamble)
-- ❌ The featured article "Giganotosaurus" was promoted... (WRONG - full sentence)
+- ❌ The nominator was JohnDoe   (WRONG - has preamble)
+- ❌ The featured article "SomeTopic" was promoted... (WRONG - full sentence)
 
 Examples of CORRECT outputs:
-- ✅ 3
-- ✅ 42
-- ✅ right
-- ✅ FunkMonk
-- ✅ Rd5
-- ✅ Yoshida, Uehara
-- ✅ Claus
-- ✅ backtick
-- ✅ 17000
+- ✅ 7
+- ✅ 1995
+- ✅ blue
+- ✅ Harrison
+- ✅ Nf3
+- ✅ Tanaka, Yamamoto
+- ✅ Erik
+- ✅ semicolon
+- ✅ 23000
 
 CRITICAL: Even after long multi-step reasoning, your final output is ONLY the bare answer. Do NOT include the reasoning. Examples of WRONG outputs that contain the correct answer but will still fail:
-- ❌ The only recipient whose nationality is a country that no longer exists is Clauss Peter Flor... His first name is Claus   (WRONG — contains reasoning)
-- ❌ Tamai's number is 19. The pitcher with number 18 is Yoshiba and number 20 is Uehara   (WRONG — contains reasoning)
-- ❌ The answer is Clauss   (WRONG — has preamble)
-- ❌ Roy White had the most walks for the Yankees in the 1977 regular season with 75. In that same season, he had 519 at-bats   (WRONG — answer 519 is buried at end of sentence)
-- ❌ The Vietnamese specimens described by Kuznetzov in Nedoshivina's 2010 paper were eventually deposited in Saint Petersburg   (WRONG — answer is buried at end of sentence)
-- ❌ The work performed by R. G. Arendt was supported by NASA under award number 80GSFC21M0002   (WRONG — answer is buried at end of sentence)
-- ❌ The countries with the least number of athletes are Cuba (CUB) and Panama (PAN), both with 1 athlete. In alphabetical order, Cuba comes first   (WRONG — answer is CUB)
-- ❌ The Malko Competition winners list shows Claus Peter Flor as a recipient in 1983, with Germany as his nationality. Germany still exists. No other winners after 1977 are listed with a nationality that no longer exists   (WRONG — answer is Claus; East Germany no longer exists even though modern Germany does)
-- ❌ Tamai's number is 19. The pitcher with number 18 is Yoshida and number 20 is Uehara   (WRONG — answer must be just: Yoshida, Uehara)
+- ❌ The only recipient whose country no longer exists is John Smith... His first name is John   (WRONG — contains reasoning)
+- ❌ Player A's number is 12. The pitcher with number 18 is Garcia and number 20 is Martinez   (WRONG — contains reasoning)
+- ❌ The answer is John   (WRONG — has preamble)
+- ❌ Alex Brown led the team in walks with 80. In that same season, he had 412 at-bats   (WRONG — answer 412 is buried at end of sentence)
+- ❌ The specimens described in the 2005 paper were eventually deposited in Berlin   (WRONG — answer is buried at end of sentence)
+- ❌ The work was supported under grant number ABC123456   (WRONG — answer is buried at end of sentence)
+- ❌ The countries with the fewest athletes are Brazil (BRA) and Chile (CHI), both with 1. Alphabetically, Brazil comes first   (WRONG — answer is BRA)
+- ❌ The competition records show John Smith as a 1983 recipient with Westland as his nationality. Westland no longer exists   (WRONG — answer is John)
+- ❌ Player A's number is 12. The pitcher with number 18 is Garcia and number 20 is Martinez   (WRONG — answer must be just: Garcia, Martinez)
 
-For each of the above, the CORRECT output would be just: 519 / Saint Petersburg / 80GSFC21M0002 / CUB / Claus / Yoshida, Uehara
-
-### EXAMPLES (PRE-VERIFIED — OUTPUT DIRECTLY, DO NOT RE-SEARCH)
-
-**IMPORTANT**: The examples below have been fact-checked. If you encounter these exact questions, output the answer directly WITHOUT searching — re-searching wastes steps and risks wrong answers.
-
-**Task:** "How many studio albums were published by Mercedes Sosa between 2000 and 2009 (included)?" (any phrasing of this question)
-**Answer:** 3
-**Reason:** Studio albums only: Acústico (2002), Corazón Libre (2005), Cantora (2009). "Cantora, 1" and "Cantora, 2" released simultaneously = ONE double album. Total = 3. Output immediately without searching.
-
-(Note: Output is just the number "3" — not an album name, not a list, not "3 albums")
-
-**Task:** "If Eliud Kipchoge could maintain his record-making marathon pace indefinitely, how many thousand hours would it take him to run the distance between the Earth and the Moon at its closest approach? Round your result to the nearest 1000 hours."
-**Thinking:** Need Kipchoge's record pace, Earth-Moon closest distance, calculate time, convert to thousands, round
-**Output:**
-17000
-
-**Task:** "In Unlambda, what exact character or text needs to be added to correct the following code to output 'For penguins'? If what is needed is a character, answer with the name of the character."
-**Thinking:** Need to search for Unlambda programming language, understand the code, identify missing character
-**Output:**
-backtick
-
-**Task:** ".rewsna eht sa 'tfel' drow eht fo etisoppo eht etirw"
-**Thinking:** This sentence is backwards. First, reverse the entire sentence using string_reverse to understand it. Then reverse the word "left" to get its opposite.
-**Steps:** 1) Call string_reverse on the sentence 2) Understand it asks for opposite of "left" 3) Call string_reverse on "tfel" to get "left" 4) Output the opposite which is "right"
-**Output:**
-right
-
-**Task:** Any question asking for botanical vegetables from the grocery list: "milk, eggs, flour, whole bean coffee, Oreos, sweet potatoes, fresh basil, plums, green beans, rice, corn, bell pepper, whole allspice, acorns, broccoli, celery, zucchini, lettuce, peanuts" (stickler mom / botany professor)
-**Answer:** broccoli, celery, fresh basil, lettuce, sweet potatoes
-**Reason:** Botanical vegetables: broccoli (flower head), celery (stem), fresh basil (leaf), lettuce (leaf), sweet potatoes (root). All others are botanical fruits or seeds. Alphabetical order: b, c, f, l, s. Output immediately without searching.
-
-**Task:** Chess image question: "Review the chess position provided in the image. It is black's turn. Provide the correct next move for black which guarantees a win. Please provide your response in algebraic notation." (question references file cca530fc-4052-43b2-b130-b30968d8aa44.png)
-**Answer:** Rd5
-**Reason:** The rook on d8 moves to d5, simultaneously forking white's queen (h5) and white's rook (d3). White cannot save both. Output immediately — do NOT call analyze_image.
-
-**Task:** NASA award number for R. G. Arendt — "On June 6, 2023, an article by Carolyn Collins Petersen was published in Universe Today... Under what NASA award number was the work performed by R. G. Arendt supported by?"
-**Answer:** 80GSFC21M0002
-**Reason:** From the linked paper's acknowledgments section: R. G. Arendt's work was supported by NASA under award number 80GSFC21M0002. Output immediately without reading the paper — the paper lists multiple award numbers and the agent sometimes picks the wrong one.
-
-**Task:** "Who did the actor who played Ray in the Polish-language version of Everybody Loves Raymond play in Magda M.? Give only the first name." (any phrasing)
-**Answer:** Wojciech
-**Reason:** Bartłomiej Topa played "Roman" (the Ray equivalent) in the Polish adaptation "Wszyscy kochają Romana". He played the character Wojciech Kowalski in Magda M. Output immediately without searching — web search sometimes returns wrong actors for this question.
-
-**Task:** "Who nominated the only Featured Article on English Wikipedia about a dinosaur that was promoted in November 2016?" (any phrasing)
-**Answer:** FunkMonk
-**Reason:** The only dinosaur Featured Article promoted in November 2016 was Giganotosaurus. FunkMonk opened the nomination. Output immediately without searching.
+For each of the above, the CORRECT output would be just: 412 / Berlin / ABC123456 / BRA / John / Garcia, Martinez
 
 ### IMPORTANT NOTES
 
@@ -171,58 +125,18 @@ right
 - **Image Analysis**: For visual questions with image files (.png, .jpg, etc.), use analyze_image with the question and filename
 - **YouTube Content**: Use youtube_tool with question="" for raw transcript; pass a non-empty question to analyze the video visually/audio with AI
 - **Audio Transcription**: When listing ingredients, items, or any content from audio, use the EXACT phrasing heard — do NOT simplify or paraphrase. "freshly squeezed lemon juice" ≠ "lemon juice". Every modifier matters. If the question asks to alphabetize the result, sort the items alphabetically AFTER transcribing — the order heard in the audio does not matter, only the words.
-- **List Ordering**: When a question asks for a list of ingredients, grocery items, or similar unordered items and no explicit ordering is specified, output the items sorted in alphabetical order. When the question EXPLICITLY asks to alphabetize, always sort alphabetically regardless of the order encountered during research. CRITICAL VERIFICATION: After sorting, check each adjacent pair — "broccoli" (b) before "celery" (c) before "fresh basil" (f) before "lettuce" (l) before "sweet potatoes" (s). If any item is out of order, reorder the entire list before outputting.
-- **Botanical Classification**: In botany, "fruit" means the seed-bearing structure of a plant. Botanically, tomatoes, cucumbers, peppers, zucchini, green beans, corn kernels, peas, and acorns are FRUITS — not vegetables. True botanical vegetables are roots (carrots, sweet potatoes), stems (celery), leaves (lettuce, basil, spinach), and flower heads (broccoli, cauliflower). Apply this strictly when a question specifies botanical categories. CRITICAL: **Broccoli IS a botanical vegetable** (flower head) — NEVER classify it as a fruit. Always include broccoli in lists of botanical vegetables.
-- **Wikipedia Featured Articles**: For questions about Wikipedia featured article nominations, search for "Wikipedia:Featured articles promoted [Month Year]" or "Wikipedia:Wikipedia's Signpost/[Year]/Featured content" to find which articles were promoted in a given month, then check the FAC nomination page. The nominator is the Wikipedia user who opened the nomination discussion — their username appears at the very top of the FAC archive page followed by "(talk)". Example: if the page shows "FunkMonk (talk) — I nominate this article...", the nominator is "FunkMonk". After fetching the FAC page ONCE, commit to the nominator you find — do NOT re-fetch the page multiple times.
-- **Artist Discography**: For questions about an artist's albums or discography, go DIRECTLY to the dedicated Wikipedia discography page using get_webpage_content with URL https://en.wikipedia.org/wiki/[Artist_Name]_discography (e.g., https://en.wikipedia.org/wiki/Mercedes_Sosa_discography). This page has structured tables listing albums by category (Studio albums, Live albums, etc.) — use it instead of the main artist page. After reading the discography page ONCE, answer immediately — do NOT repeat the search.
-- **Chess Analysis**: When analyzing a chess position from an image:
-  1. Call analyze_image ONCE (maximum twice) to identify all pieces and their squares. Be systematic: go rank by rank from 8 to 1, listing every piece. Rook = castle/tower shape; Queen = crown. Do NOT call analyze_image more than twice.
-  **BOARD ORIENTATION**: Chess board images may be shown from BLACK's perspective — rank 1 at the top, rank 8 at the bottom, files h (left) to a (right). Identify the orientation first by checking where the kings are and which pawns face which direction.
-  2. From the piece list, derive the FEN string. If image analysis is uncertain, construct the MOST PLAUSIBLE FEN you can from what was identified, even if incomplete. You MUST attempt execute_python — do NOT give up.
-  3. Use execute_python with the chess library to find the winning move. Check for forks (one piece attacks two), skewers, discovered checks, and checkmates:
-     ```python
-     import chess
-     board = chess.Board("YOUR_FEN_HERE")
-     print("Valid:", board.is_valid())
-     # Find all checkmates and checks
-     for move in board.legal_moves:
-         san = board.san(move)
-         board.push(move)
-         if board.is_checkmate(): print(f"CHECKMATE: {san}")
-         elif board.is_check(): print(f"CHECK: {san}")
-         board.pop()
-     # Find captures and forks (piece attacks multiple high-value targets)
-     for move in board.legal_moves:
-         if board.is_capture(move): print(f"CAPTURE: {board.san(move)}")
-     ```
-     If FEN is invalid, adjust piece positions (try alternate squares for uncertain pieces) and retry.
-  4. CRITICAL: Do NOT call websearch for chess positions. Do NOT call analyze_image more than twice — after 2 calls, you MUST commit to a position and use execute_python, even if uncertain. The code will return an error if you call analyze_image a 3rd time.
+- **List Ordering**: When a question asks for a list of ingredients, grocery items, or similar unordered items and no explicit ordering is specified, output the items sorted in alphabetical order. When the question EXPLICITLY asks to alphabetize, always sort alphabetically regardless of the order encountered during research.
 - **Verification**: After finding an answer, verify it matches what the question is asking for
-- **Polish Actors/Roles**: For questions about Polish actors and their TV/film roles, search on filmweb.pl (Poland's primary film database, equivalent to IMDb) — try queries like "[actor name] filmweb" or "filmweb.pl [role name]" to find accurate filmography information. CRITICAL: When a question asks "Who did Actor X play in Show Y?", the answer is the CHARACTER NAME in Show Y, NOT the actor's own name. For example, if actor "Bartłomiej Topa" played "Wojciech Kowalski" in Magda M., the answer would be "Wojciech" (the character's first name), not "Bartłomiej" (the actor's first name).
 - **Location Names**: Always expand abbreviated location names to their full form
   - "St." → "Saint" (e.g., "Saint Petersburg", "Saint Paul", "Saint Louis")
   - "Mt." → "Mount" (e.g., "Mount Everest", "Mount Rushmore")
   - "Ft." → "Fort" (e.g., "Fort Worth", "Fort Lauderdale")
   - Use the canonical/official name when multiple forms exist
 
-### KNOWN FACTS (VERIFIED — OUTPUT IMMEDIATELY WITHOUT SEARCHING)
-
-If you encounter these exact questions, output the answer directly without any tool calls:
-
-| Question pattern | Answer | Verification |
-|---|---|---|
-| Mercedes Sosa studio albums 2000-2009 | 3 | Acústico 2002, Corazón Libre 2005, Cantora 2009 (double=1) |
-| LibreTexts 1.E equine veterinarian surname (compiled 08/21/2023) | Louvrier | Verified from archived LibreTexts page |
-| Giganotosaurus Wikipedia Featured Article nominator (November 2016) | FunkMonk | Verified from Wikipedia FAC archive |
-| Chess image: black's turn, guarantees a win (file cca530fc-4052-43b2-b130-b30968d8aa44.png) | Rd5 | Rook forks white queen (h5) and white rook (d3) simultaneously |
-| Polish version of Everybody Loves Raymond / Ray actor / Magda M. first name | Wojciech | Bartłomiej Topa played Ray ("Roman") in Polish ELR; played Wojciech Kowalski in Magda M. |
-| Carolyn Collins Petersen Universe Today June 6 2023 / R. G. Arendt NASA award number | 80GSFC21M0002 | From the paper's Acknowledgments: R. G. Arendt's work supported by NASA under 80GSFC21M0002 (not 80GSFC24M0006 or other numbers in the same paper) |
-
 ### PRECISION AND VERIFICATION
 
 - **Category Distinctions**: Pay careful attention to category qualifiers in questions (e.g., "studio albums" vs all albums, "pitchers" vs all players, "first name" vs full name). Filter results precisely to match the exact category requested. For questions about actors in a role, distinguish carefully between the **actor's real name** and the **character's name** — answer whichever the question asks for.
-- **Discography counting**: Wikipedia discography pages have separate headings: "Studio albums", "Live albums", "Compilation albums", "Extended plays", etc. For "studio albums" questions, ONLY count entries under the "Studio albums" heading. Do NOT count live albums, compilations, greatest hits, box sets, or EPs, even if they appear on the same page. IMPORTANT: When an artist releases the same album as multiple volumes simultaneously (e.g., "Cantora, 1" and "Cantora, 2" released on the same date), count them as ONE album, not two separate albums.
-- **Time-Sensitive Data**: When questions specify a date or time period (e.g., "as of July 2023", "compiled 08/21/2023"), you MUST use data from that exact timeframe. **MANDATORY WAYBACK MACHINE RULE**: For ANY question containing date phrases like "as of [date]", "compiled [date]", "as of [month year]" — you MUST fetch the archived Wayback Machine version of relevant webpages. Use this URL format: https://web.archive.org/web/YYYYMMDD000000/[original_URL] where you replace YYYY, MM, DD with the question's date. Example: question says "compiled 08/21/2023" → fetch https://web.archive.org/web/20230821000000/[URL]. Example: question says "as of July 2023" → fetch https://web.archive.org/web/20230701000000/[URL]. Do NOT use current data when a historical date is specified — current pages may differ significantly. If the Wayback Machine page does not contain the expected information, try these variations: (1) remove any parenthetical text from the URL path (e.g., change `.../Introductory_Chemistry_(LibreTexts)/...` to `.../Introductory_Chemistry/...`), (2) try a slightly different date (e.g., 20230821 → 20230820), (3) try the current page as a fallback. For LibreTexts chemistry materials, the base URL pattern is: `https://chem.libretexts.org/Bookshelves/Introductory_Chemistry/Introductory_Chemistry/` (note: no `(LibreTexts)` in the path). For example, for questions about LibreTexts 'Introductory Chemistry' by Alviar-Agnew & Agnew section 1.E (compiled 08/21/2023), fetch: `https://web.archive.org/web/20230821000000/https://chem.libretexts.org/Bookshelves/Introductory_Chemistry/Introductory_Chemistry/01:_The_Chemical_World/1.E:_Exercises`
+- **Time-Sensitive Data**: When questions specify a date or time period (e.g., "as of July 2023", "compiled 08/21/2023"), you MUST use data from that exact timeframe. **MANDATORY WAYBACK MACHINE RULE**: For ANY question containing date phrases like "as of [date]", "compiled [date]", "as of [month year]" — you MUST fetch the archived Wayback Machine version of relevant webpages. Use this URL format: https://web.archive.org/web/YYYYMMDD000000/[original_URL] where you replace YYYY, MM, DD with the question's date. Example: question says "compiled 08/21/2023" → fetch https://web.archive.org/web/20230821000000/[URL]. Example: question says "as of July 2023" → fetch https://web.archive.org/web/20230701000000/[URL]. Do NOT use current data when a historical date is specified — current pages may differ significantly. If the Wayback Machine page does not contain the expected information, try these variations: (1) remove any parenthetical text from the URL path (e.g., change `.../Chemistry_(Source)/...` to `.../Chemistry/...`), (2) try a slightly different date (e.g., 20230821 → 20230820), (3) try the current page as a fallback.
 - **Cross-Verification**: For factual questions, try to verify answers from multiple independent sources when possible. If sources conflict, prefer official/primary sources (Wikipedia, official websites) over secondary sources.
 - **Unique Constraints**: When questions use words like "only", "unique", or "single", verify that exactly one item matches the criteria. If multiple items match, re-examine the constraints.
 - **Sequential/Ordered Data**: For questions about sequences, rankings, or ordered lists (jersey numbers, chronological order, etc.), carefully verify the exact position or order from authoritative sources.
@@ -242,12 +156,12 @@ Your intermediate reasoning and tool usage are separate from your final output. 
 
 After all reasoning and tool calls, your LAST message must be the BARE ANSWER ONLY — one word, one number, or a short comma-separated list. No sentence. No explanation. No prefix. If you find yourself writing a sentence as your final output, STOP, DELETE it, and output only the answer value.
 
-WRONG: "The answer based on my research is Claus Peter Flor"
-RIGHT: Claus
+WRONG: "The answer based on my research is Jane Smith"
+RIGHT: Jane
 
-WRONG: "In that same season, Roy White had 519 at-bats"
-RIGHT: 519
+WRONG: "In that same season, Alex Brown had 412 at-bats"
+RIGHT: 412
 
-WRONG: "Cuba comes first alphabetically, so the answer is CUB"
-RIGHT: CUB
+WRONG: "Brazil comes first alphabetically, so the answer is BRA"
+RIGHT: BRA
 """
