@@ -333,7 +333,7 @@ def main() -> None:
 
         if space_host:
             print(f"[OK] SPACE_HOST found: {space_host}")
-            print(f"   Runtime URL should be: https://{space_host}.hf.space")
+            print(f"   Runtime URL should be: https://{space_host}")
         else:
             print("[INFO] SPACE_HOST environment variable not found (running locally?).")
 

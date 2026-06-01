@@ -43,11 +43,16 @@ _HTTP_HEADERS = {
 _analyze_image_call_count = 0
 MAX_ANALYZE_IMAGE_CALLS = 2
 
+# Maps normalized websearch query -> its result string, for the current question.
+# Lets websearch detect and short-circuit verbatim repeated queries (loop guard).
+_websearch_seen_queries = {}
+
 
 def reset_tool_counters():
     """Reset per-question tool counters. Call at the start of each new question."""
     global _analyze_image_call_count
     _analyze_image_call_count = 0
+    _websearch_seen_queries.clear()
 
 
 # ============================================================================
@@ -248,12 +253,30 @@ def websearch(query: str) -> str:
 
     try:
         print(f"websearch called: {query}")
+
+        # Loop guard: if this exact query (normalized) was already run for the
+        # current question, don't re-run it — repeating it returns nothing new.
+        # Return the prior results plus a nudge to change strategy or answer.
+        norm_query = " ".join(query.lower().split())
+        if norm_query in _websearch_seen_queries:
+            print("[WEBSEARCH] Duplicate query detected — returning cached result with nudge")
+            return (
+                "DUPLICATE SEARCH: You already ran this exact query earlier for this question, "
+                "so it returns no new information. Do NOT repeat it. Instead: try a substantially "
+                "different query, call get_webpage_content on a promising URL from earlier results, "
+                "or give your best answer now based on what you already have.\n\n"
+                f"Previous results for this query:\n{_websearch_seen_queries[norm_query]}"
+            )
+
         with DDGS() as ddgs:
             results = ddgs.text(query, max_results=5, timelimit='y')  # Limit to past year for faster results
             if results:
                 print(f"websearch results: {len(results)}")
-                return "\n\n".join([f"Title: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}" for r in results])
-            return "No results found. Try search with a different query."
+                output = "\n\n".join([f"Title: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}" for r in results])
+            else:
+                output = "No results found. Try search with a different query."
+        _websearch_seen_queries[norm_query] = output
+        return output
     except Exception as e:
         return f"Search error (try again): {str(e)}"
 
